@@ -1,0 +1,16 @@
+{
+  "name": "アフィポ - Threads向け商品紹介ポスト作成",
+  "short_name": "アフィポ",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ffffff",
+  "background_color": "#f6f6f4",
+  "icons": [
+    { "src": "/logo192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/logo512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/maskable512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,28 @@
+name = "affi-post"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# アプリ本体（Expo の Web 書き出し = PWA）を同じドメインで配信する。/v1/* だけ Worker が処理する
+[assets]
+directory = "../dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/v1/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "affi-post"
+database_id = "00000000-0000-0000-0000-000000000000" # `npx wrangler d1 create affi-post` で表示された ID に置き換える
+
+[vars]
+# Claude のモデルと1回の生成で出力できる最大トークン数（= 1回あたりの最大原価を決める）
+MODEL = "claude-sonnet-5-5"
+MAX_OUTPUT_TOKENS = "3000"
+# 月間の Claude API 費用上限（USD）。超えると翌月まで生成を止める。売れたら引き上げる
+MONTHLY_BUDGET_USD = "20"
+# Stripe 決済 = 付与回数。キーは Payment Link ID（plink_...）か「通貨+支払額」（jpy300 など）
+STRIPE_LINKS = "jpy300:30,jpy800:100"
+
+# シークレットは `npx wrangler secret put <NAME>` で設定する（このファイルには書かない）
+#   ANTHROPIC_API_KEY     … 販売者の Claude API キー
+#   STRIPE_WEBHOOK_SECRET … Stripe Webhook の署名シークレット（whsec_...）

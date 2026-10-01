@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "アフィポ",
+    "slug": "affi-post",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yamak.affipost",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#16161A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.yamak.affipost"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "アフィポ",
+      "shortName": "アフィポ",
+      "lang": "ja",
+      "themeColor": "#16161A",
+      "backgroundColor": "#F6F6F4"
+    }
+  }
+}

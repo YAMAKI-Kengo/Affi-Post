@@ -1,0 +1,19 @@
+{
+  "name": "affi-post-api",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute affi-post --remote --file=schema.sql",
+    "db:init:local": "wrangler d1 execute affi-post --local --file=schema.sql",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261001.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.146.0"
+  },
+  "private": true
+}

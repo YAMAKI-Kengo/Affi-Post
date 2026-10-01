@@ -1,0 +1,26 @@
+/**
+ * API サーバーの URL。Web 版（PWA）は同じドメインの Worker が配信するので空でよい。
+ * ローカル開発やネイティブ版では EXPO_PUBLIC_API_BASE に Worker の URL を設定する。
+ */
+export const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? '').replace(/\/$/, '');
+
+/**
+ * 回数パック（Stripe Payment Link）
+ * 形式: "表示名|URL,表示名|URL"  例: "30回 300円|https://buy.stripe.com/xxx"
+ */
+export const WEB_PACKS: { label: string; url: string }[] = String(process.env.EXPO_PUBLIC_WEB_PACKS ?? '')
+  .split(',')
+  .map((s: string) => s.split('|').map((x) => x.trim()))
+  .filter(([label, url]) => label && url?.startsWith('https://'))
+  .map(([label, url]) => ({ label, url }));
+
+/** 特定商取引法に基づく表記・利用規約・プライバシーポリシー（public/ 配下の静的ページ） */
+export const LEGAL_PAGES = [
+  { label: '使い方', path: '/guide.html' },
+  { label: '利用規約', path: '/terms.html' },
+  { label: 'プライバシーポリシー', path: '/privacy.html' },
+  { label: '特定商取引法に基づく表記', path: '/tokushoho.html' },
+];
+
+/** Threads の1投稿あたりの最大文字数 */
+export const THREADS_MAX_CHARS = 500;
