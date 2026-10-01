@@ -4,11 +4,22 @@
  * - 販売者の Claude API キーはこのサーバーのシークレットにのみ保存し、アプリには一切渡さない
  * - 利用者は端末ごとのランダムIDで識別し、1回の生成（3パターン）で1回分を消費する。無料枠はない
  * - 生成に失敗した場合は回数を戻す。月間の API 費用が上限（MONTHLY_BUDGET_USD）に達したら生成を止める
+ * - 上級者向けの予約投稿（autopost.ts）は、利用者自身の Threads アクセストークンで公式 API から投稿する
  */
 import { GenerateError, GenerateInput, generatePosts, worstCaseCost } from './generate';
 import { fetchProduct } from './product';
+import {
+  AutopostEnv,
+  handleAccount,
+  handleCancel,
+  handleConnect,
+  handleDisconnect,
+  handleList,
+  handleSchedule,
+  runAutopost,
+} from './autopost';
 
-export interface Env {
+export interface Env extends AutopostEnv {
   DB: D1Database;
   ANTHROPIC_API_KEY: string;
   MODEL: string;
@@ -212,6 +223,14 @@ async function handleStripe(req: Request, env: Env) {
   return json({ ok: true });
 }
 
+/** 端末IDが必要な自動投稿系 API の共通処理 */
+async function withUser(req: Request, env: Env, fn: (id: string) => Promise<Response>) {
+  const id = installId(req);
+  if (!id) return fail(400, 'bad_install_id', '端末IDが不正です。');
+  await getUser(env, id);
+  return fn(id);
+}
+
 /** ローカル開発専用：回数を付与する */
 async function handleDevGrant(req: Request, env: Env) {
   const id = installId(req);
@@ -229,11 +248,26 @@ export default {
       if (req.method === 'POST' && pathname === '/v1/product') return await handleProduct(req, env);
       if (req.method === 'POST' && pathname === '/v1/generate') return await handleGenerate(req, env);
       if (req.method === 'POST' && pathname === '/v1/stripe') return await handleStripe(req, env);
+      if (req.method === 'GET' && pathname === '/v1/threads/account') return await withUser(req, env, (id) => handleAccount(env, id));
+      if (req.method === 'POST' && pathname === '/v1/threads/connect') return await withUser(req, env, (id) => handleConnect(req, env, id));
+      if (req.method === 'POST' && pathname === '/v1/threads/disconnect') return await withUser(req, env, (id) => handleDisconnect(env, id));
+      if (req.method === 'GET' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleList(env, id));
+      if (req.method === 'POST' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleSchedule(req, env, id));
+      if (req.method === 'POST' && pathname === '/v1/schedule/cancel') return await withUser(req, env, (id) => handleCancel(req, env, id));
       if (req.method === 'POST' && pathname === '/v1/dev/grant') return await handleDevGrant(req, env);
+      if (req.method === 'POST' && pathname === '/v1/dev/cron' && env.DEV_MODE === '1') {
+        await runAutopost(env);
+        return json({ ok: true });
+      }
       return fail(404, 'not_found', 'not found');
     } catch (e) {
       console.error(e);
       return fail(500, 'internal', 'サーバーエラーが発生しました。');
     }
+  },
+
+  // 予約投稿の実行とトークン更新（5分ごと）
+  async scheduled(_: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runAutopost(env));
   },
 };

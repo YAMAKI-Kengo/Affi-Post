@@ -26,3 +26,8 @@ STRIPE_LINKS = "jpy300:30,jpy800:100"
 # シークレットは `npx wrangler secret put <NAME>` で設定する（このファイルには書かない）
 #   ANTHROPIC_API_KEY     … 販売者の Claude API キー
 #   STRIPE_WEBHOOK_SECRET … Stripe Webhook の署名シークレット（whsec_...）
+#   TOKEN_ENC_KEY         … 利用者の Threads トークンを暗号化する鍵（長いランダム文字列。変更すると全員が再接続になる）
+
+# 予約投稿の実行（5分ごと）
+[triggers]
+crons = ["*/5 * * * *"]

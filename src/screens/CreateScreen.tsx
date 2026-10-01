@@ -10,6 +10,7 @@ import { BUILT_IN_TEMPLATES, loadCustomTemplates, loadProductDraft, saveProductD
 import { openThreads } from '../threads';
 import { Draft, Pattern, ProductForm, Template, emptyProduct } from '../types';
 import { Button, Card, Chip, Field, Label, StepTitle, colors, styles } from '../ui';
+import ScheduleBox from './ScheduleBox';
 
 const TONES = ['カジュアル', '丁寧', '熱量高め', '落ち着いた'];
 const K_RESULT = 'last_result_v1';
@@ -360,6 +361,7 @@ export default function CreateScreen() {
               }
             />
           ) : null}
+          <ScheduleBox draft={editor} onScheduled={() => save({})} />
         </View>
       )}
     </ScrollView>

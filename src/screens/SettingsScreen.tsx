@@ -8,6 +8,7 @@ import { DISCLOSURE_LABEL } from '../compliance';
 import { ID_RE, getInstallId, setInstallId } from '../storage';
 import { DisclosureStyle } from '../types';
 import { Button, Card, Chip, Field, Label, colors, styles } from '../ui';
+import AutopostSettings from './AutopostSettings';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -102,6 +103,8 @@ export default function SettingsScreen() {
         アフィリエイトの紹介投稿には、広告であることが分かる表記が必要です（ステルスマーケティング規制）。分かりやすい先頭の【PR】がおすすめです。
       </Text>
 
+      <AutopostSettings />
+
       <Label hint="機種変更やブラウザを変えるときに使います">引き継ぎコード</Label>
       <Card style={{ marginTop: 0 }}>
         <Text selectable style={{ fontFamily: 'monospace', color: colors.text, fontSize: 13 }}>
@@ -146,7 +149,7 @@ export default function SettingsScreen() {
         ))}
       </View>
       <Text style={[styles.small, { marginTop: 8 }]}>
-        作成した文章や商品情報、履歴はこの端末の中にだけ保存されます。投稿は Threads の公式の投稿画面から、ご自身で行います。
+        作成した文章や商品情報、履歴はこの端末の中にだけ保存されます。通常の投稿は Threads の公式の投稿画面から、ご自身で行います。
       </Text>
     </ScrollView>
   );

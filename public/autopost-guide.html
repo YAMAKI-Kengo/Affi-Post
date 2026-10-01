@@ -1,0 +1,49 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{--bg:#f6f6f4;--card:#fff;--text:#16161a;--sub:#5f6368;--line:#e2e2de;--acc:#6d4aff}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--card:#1c1c20;--text:#ececef;--sub:#a0a3a8;--line:#2c2c32;--acc:#9c86ff}}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif;line-height:1.75}
+main{max-width:680px;margin:0 auto;padding:24px 16px 64px}h1{font-size:22px;margin:8px 0 16px}h2{font-size:17px;margin:28px 0 8px}
+p,li{font-size:15px}.sub{color:var(--sub);font-size:13px}table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden}
+th,td{text-align:left;vertical-align:top;padding:12px;border-bottom:1px solid var(--line);font-size:14px}th{width:34%;color:var(--sub);font-weight:600}
+.todo{color:#d93025;font-weight:700}a{color:var(--acc)}.step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0}
+a.back{display:inline-block;margin-bottom:8px;font-size:14px}</style><title>自動投稿の設定方法｜アフィポ</title></head><body><main><a class="back" href="/">← アプリに戻る</a><h1>自動投稿の設定方法</h1>
+<p>自動投稿（予約投稿）は、確認済みの投稿を指定した日時に Threads へ自動で投稿する上級者向けの機能です。Threads の公式 API を、<b>ご自身で作成した Meta アプリ</b>を通して使います。初回の設定に10〜15分ほどかかります。</p>
+<p class="sub">Meta の画面は予告なく変わることがあります。名称が違う場合は近い項目を探してください。</p>
+
+<h2>1. Meta for Developers に登録する</h2>
+<div class="step"><a href="https://developers.facebook.com/" target="_blank" rel="noopener">developers.facebook.com</a> を開き、Facebook / Meta アカウントでログインして開発者として登録します。</div>
+
+<h2>2. アプリを作る</h2>
+<div class="step">「マイアプリ」→「アプリを作成」。ユースケースは<b>「Threads API にアクセス」</b>を選び、アプリ名（例：my-affipost）を付けて作成します。</div>
+<div class="step">作成したアプリの「ユースケース」→ Threads API の「カスタマイズ」で、権限 <b>threads_basic</b> と <b>threads_content_publish</b> が追加されていることを確認します（なければ追加）。</div>
+
+<h2>3. 自分の Threads アカウントをテスターにする</h2>
+<div class="step">アプリの「アプリの役割」→「役割」→「メンバーを追加」→ <b>Threads テスター</b> に、自分の Threads のユーザー名を追加します。</div>
+<div class="step">Threads アプリ（または threads.com）で「設定」→「アカウント」→「ウェブサイトのアクセス許可」→「招待」を開き、届いた招待を<b>承認</b>します。</div>
+
+<h2>4. アクセストークンを発行する</h2>
+<div class="step">アプリの Threads API ユースケースの「設定」にある<b>ユーザートークン生成ツール</b>で、自分のアカウントの「アクセストークンを生成」を押し、表示されたトークンをコピーします。</div>
+<div class="step">同じ画面の <b>Threads アプリシークレット</b>（「表示」を押すと見られます）もコピーしておきます。短期トークンを60日間有効なトークンに交換するために1度だけ使い、アフィポは保存しません。</div>
+
+<h2>5. アフィポと接続する</h2>
+<div class="step">アフィポの「設定」→「自動投稿」→「Threads と接続する」に、アクセストークンとアプリシークレットを貼り付けて「接続する」。@ユーザー名が表示されれば完了です。</div>
+<div class="step">以降は「作成」画面の編集欄にある「日時を指定して自動投稿」から予約できます。予約の状態は「履歴」→「⏰ 予約」で確認・取り消しできます。</div>
+
+<h2>使い方のルール（スパム判定を避けるため）</h2>
+<ul>
+<li>自動投稿は<b>1日5件まで</b>、前後の予約と<b>60分以上</b>あける必要があります</li>
+<li>同じ文章は14日間、再予約できません</li>
+<li>投稿時刻は指定から最大15分ずれます（毎日まったく同じ時刻の投稿は機械的に見えるため）</li>
+<li>リンクの位置を「リプ欄に貼る」にすると、本文の投稿後に、リンク付きのリプを自分の投稿に自動で付けます</li>
+<li>予約1件につき1回分を使います。投稿前の取り消し・投稿失敗のときは回数が戻ります</li>
+</ul>
+<p>Meta はリンク付きの投稿を機械的に繰り返すアカウントを制限することがあります。紹介投稿だけでなく、ふだんのつぶやきや交流も手動で行うことをおすすめします。アカウントの制限について当方は責任を負えません。</p>
+
+<h2>トークンについて</h2>
+<ul>
+<li>アクセストークンは暗号化してサーバーに保存し、予約投稿とトークンの延長だけに使います</li>
+<li>トークンは自動で延長されます。60日以上アフィポで自動投稿をしなかった場合などに切れたときは、4〜5 をやり直してください</li>
+<li>「接続を解除」するとトークンは削除され、未投稿の予約は取り消されて回数が戻ります</li>
+<li>Meta アプリ側でアプリを削除・テスターを外すと、自動投稿はできなくなります</li>
+</ul>
+</main></body></html>

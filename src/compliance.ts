@@ -1,7 +1,11 @@
 import { DisclosureStyle } from './types';
 
-/** Threads の文字数（絵文字なども1文字として数える） */
-export const charCount = (s: string) => Array.from(s).length;
+/** Threads の文字数（公式ドキュメント: 絵文字は UTF-8 のバイト数で数える。それ以外は1文字1） */
+export function charCount(s: string) {
+  let n = 0;
+  for (const ch of s) n += /\p{Extended_Pictographic}/u.test(ch) ? new TextEncoder().encode(ch).length : 1;
+  return n;
+}
 
 export const DISCLOSURE_LABEL: Record<DisclosureStyle, string> = {
   prefix: '先頭に【PR】',

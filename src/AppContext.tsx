@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
-import { fetchBalance } from './api';
+import { ThreadsAccount, fetchBalance, fetchThreadsAccount } from './api';
 import { loadSettings, saveSettings } from './storage';
 import { AppSettings, HistoryItem, defaultSettings } from './types';
 
@@ -18,6 +18,9 @@ interface Ctx {
   reopen: HistoryItem | null;
   openInEditor: (item: HistoryItem | null) => void;
   toast: (message: string) => void;
+  /** 自動投稿（予約投稿）用の Threads 接続状態 */
+  account: ThreadsAccount | null;
+  setAccount: (a: ThreadsAccount) => void;
 }
 
 const AppCtx = createContext<Ctx>(null as never);
@@ -29,6 +32,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [credits, setCredits] = useState<number | null>(null);
   const [reopen, setReopen] = useState<HistoryItem | null>(null);
   const [toastMsg, setToastMsg] = useState('');
+  const [account, setAccount] = useState<ThreadsAccount | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -56,6 +60,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshCredits();
+    fetchThreadsAccount()
+      .then(setAccount)
+      .catch(() => {});
   }, [refreshCredits]);
 
   const toast = useCallback(
@@ -77,7 +84,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppCtx.Provider
-      value={{ tab, setTab, settings, updateSettings, credits, setCredits, refreshCredits, reopen, openInEditor, toast }}
+      value={{ tab, setTab, settings, updateSettings, credits, setCredits, refreshCredits, reopen, openInEditor, toast, account, setAccount }}
     >
       {children}
       <Animated.View pointerEvents="none" style={[st.toast, { opacity }]}>

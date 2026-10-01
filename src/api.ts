@@ -49,3 +49,46 @@ export const generate = (p: ProductForm, template: string, tone: string, linkPla
       linkPlacement,
     },
   });
+
+// ---- 自動投稿（予約投稿・上級者向け） ----
+
+export interface ThreadsAccount {
+  connected: boolean;
+  username?: string;
+  expiresAt?: number;
+  /** active / reconnect（トークン失効などで再接続が必要） */
+  status?: string;
+}
+
+export interface ScheduledPost {
+  id: string;
+  text: string;
+  link: string;
+  link_placement: string;
+  reply_text: string;
+  topic: string;
+  scheduled_at: number;
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'canceled';
+  error: string;
+  threads_post_id: string | null;
+}
+
+export const fetchThreadsAccount = () => call<ThreadsAccount>('/v1/threads/account');
+
+export const connectThreads = (token: string, appSecret: string) =>
+  call<ThreadsAccount>('/v1/threads/connect', { method: 'POST', body: { token, appSecret } });
+
+export const disconnectThreads = () => call<{ connected: false; refunded: number }>('/v1/threads/disconnect', { method: 'POST' });
+
+export const fetchSchedule = () => call<{ posts: ScheduledPost[] }>('/v1/schedule');
+
+export const schedulePost = (p: {
+  text: string;
+  link: string;
+  linkPlacement: LinkPlacement;
+  reply: string;
+  topic: string;
+  scheduledAt: number;
+}) => call<{ id: string; credits: number }>('/v1/schedule', { method: 'POST', body: p });
+
+export const cancelScheduled = (id: string) => call<{ ok: true }>('/v1/schedule/cancel', { method: 'POST', body: { id } });

@@ -5,11 +5,13 @@ import { useApp } from '../AppContext';
 import { loadHistory, removeHistory, upsertHistory } from '../storage';
 import { HistoryItem } from '../types';
 import { Button, Card, Chip, colors, formatDate, styles } from '../ui';
+import ScheduledList from './ScheduledList';
 
 export default function HistoryScreen() {
-  const { tab, openInEditor, toast } = useApp();
+  const { tab, openInEditor, toast, account } = useApp();
   const [items, setItems] = useState<HistoryItem[]>([]);
-  const [onlyFav, setOnlyFav] = useState(false);
+  const [mode, setMode] = useState<'all' | 'fav' | 'scheduled'>('all');
+  const onlyFav = mode === 'fav';
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const reload = useCallback(() => loadHistory().then(setItems), []);
@@ -17,7 +19,7 @@ export default function HistoryScreen() {
     if (tab === 'history') reload();
   }, [tab, reload]);
 
-  const shown = onlyFav ? items.filter((i) => i.favorite) : items;
+  const shown = mode === 'scheduled' ? [] : onlyFav ? items.filter((i) => i.favorite) : items;
 
   const toggleFav = async (item: HistoryItem) => setItems(await upsertHistory({ ...item, favorite: !item.favorite }));
 
@@ -27,15 +29,21 @@ export default function HistoryScreen() {
       data={shown}
       keyExtractor={(i) => i.id}
       ListHeaderComponent={
-        <View style={styles.chips}>
-          <Chip label={`すべて（${items.length}）`} active={!onlyFav} onPress={() => setOnlyFav(false)} />
-          <Chip label={`★ お気に入り（${items.filter((i) => i.favorite).length}）`} active={onlyFav} onPress={() => setOnlyFav(true)} />
-        </View>
+        <>
+          <View style={styles.chips}>
+            <Chip label={`すべて（${items.length}）`} active={mode === 'all'} onPress={() => setMode('all')} />
+            <Chip label={`★ お気に入り（${items.filter((i) => i.favorite).length}）`} active={onlyFav} onPress={() => setMode('fav')} />
+            {account?.connected && <Chip label="⏰ 予約" active={mode === 'scheduled'} onPress={() => setMode('scheduled')} />}
+          </View>
+          {mode === 'scheduled' && tab === 'history' && <ScheduledList />}
+        </>
       }
       ListEmptyComponent={
+        mode === 'scheduled' ? null : (
         <Text style={[styles.small, { textAlign: 'center', marginTop: 40 }]}>
           {onlyFav ? 'お気に入りはまだありません。' : 'Threads で開いた・コピーした投稿がここに残ります。'}
         </Text>
+        )
       }
       renderItem={({ item }) => (
         <Card>

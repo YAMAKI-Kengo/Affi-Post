@@ -12,7 +12,12 @@
 - Claude API キーは Worker のシークレットにだけ置く。アプリには含めない
 - 1回の作成（3パターン）で1回分を消費。無料枠なし。失敗時は回数を戻す
 - 月間の API 費用が `MONTHLY_BUDGET_USD` に達したら生成を止める（赤字防止の最終ガード）
-- Threads への投稿は公式の Web インテント（`threads.com/intent/post`）で投稿画面を開くだけ。API 連携・自動投稿はしない
+- Threads への通常の投稿は公式の Web インテント（`threads.com/intent/post`）で投稿画面を開くだけ
+- 上級者向けの自動投稿（予約投稿、`server/src/autopost.ts`）は、利用者自身の Meta アプリで発行したトークンで Threads 公式 API から投稿する
+  - 利用者が確認した投稿だけを予約できる（AI が生成して自動で流すことはしない）
+  - 1日5件まで・前後60分以上あける・同じ文章は14日間不可・投稿時刻を0〜15分ランダムに遅らせる
+  - 予約1件 = 1回分。取り消し・投稿失敗のときは戻す。「API access blocked」などの恒久エラーは再試行しない
+  - トークンは AES-GCM で暗号化して D1 に保存し、Cron（5分ごと）で予約の実行と7日ごとのトークン延長を行う
 - 履歴・テンプレート・下書きは端末内（localStorage）にのみ保存
 
 ## ローカル開発
@@ -28,7 +33,11 @@ DEV_MODE=1        # 開発用の回数付与ボタンを有効化
 MOCK_AI=1         # Claude を呼ばず固定文を返す（実際に試すときは消して ANTHROPIC_API_KEY を入れる）
 ANTHROPIC_API_KEY=
 STRIPE_WEBHOOK_SECRET=whsec_localtest
+TOKEN_ENC_KEY=local-dev-key-0123456789
+PUBLISH_WAIT_MS=0                         # 本番は未設定（公式推奨の30秒待つ）
+THREADS_API_BASE=http://127.0.0.1:8799    # 自動投稿をテスト用の偽 API に向ける（本物で試すときは消す）
 ```
+予約の実行は本番では Cron。ローカルでは `POST /v1/dev/cron`（DEV_MODE=1 のときだけ有効）で手動実行できる。
 
 2つのターミナルで:
 ```
@@ -49,6 +58,7 @@ npx expo start --web --port 8081
    ```
    npx wrangler secret put ANTHROPIC_API_KEY
    npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   npx wrangler secret put TOKEN_ENC_KEY      # 長いランダム文字列。変えると全員が Threads の再接続になる
    ```
 3. Stripe で Payment Link を2つ作成（30回 300円 / 100回 800円）
    - 支払い完了後の動作:「自分のウェブサイトにリダイレクト」→ デプロイ先の URL（例 `https://affi-post.<subdomain>.workers.dev/`）
