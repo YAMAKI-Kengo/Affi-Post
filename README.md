@@ -67,7 +67,7 @@ npx expo start --web --port 8081
 4. `.env.production` の `EXPO_PUBLIC_WEB_PACKS` に Payment Link の URL を記入
 5. ビルドしてデプロイ
    ```
-   npx expo export -p web
+   npx expo export -p web --clear   # --clear が無いと古い .env の値がキャッシュから使われることがある
    cd server && npm run deploy
    ```
 6. `public/tokushoho.html`・`terms.html`・`privacy.html`・`guide.html` の【要記入】を埋めて、5 をやり直す
