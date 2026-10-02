@@ -12,7 +12,7 @@ run_worker_first = ["/v1/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "affi-post"
-database_id = "00000000-0000-0000-0000-000000000000" # `npx wrangler d1 create affi-post` で表示された ID に置き換える
+database_id = "df7632f7-399d-47af-999f-9a9d982d6a77"
 
 [vars]
 # Claude のモデルと1回の生成で出力できる最大トークン数（= 1回あたりの最大原価を決める）
