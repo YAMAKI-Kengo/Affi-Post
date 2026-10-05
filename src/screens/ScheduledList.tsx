@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useApp } from '../AppContext';
 import { ApiError, ScheduledPost, cancelScheduled, fetchSchedule } from '../api';
-import { Button, Card, colors, formatDate, styles } from '../ui';
+import { Button, Card, colors, formatDate, styles, Text, EmptyState } from '../ui';
 
 const STATUS: Record<ScheduledPost['status'], { label: string; color: string }> = {
   scheduled: { label: '予約中', color: colors.highlight },
@@ -42,9 +42,7 @@ export default function ScheduledList() {
   if (!posts) return <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />;
   if (!posts.length) {
     return (
-      <Text style={[styles.small, { textAlign: 'center', marginTop: 40 }]}>
-        予約はありません。「作成」画面の編集欄から、日時を指定して自動投稿できます（設定で Threads と接続が必要です）。
-      </Text>
+      <EmptyState icon="calendar-outline" title="予約はありません" message="作成画面の「仕上げて投稿」から、日時を指定して予約できます。" />
     );
   }
   return (

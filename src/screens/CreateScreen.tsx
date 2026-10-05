@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../AppContext';
@@ -9,12 +9,18 @@ import { charCount, checkExpressions, hasDisclosure, isHttpUrl, looksLikeAffilia
 import { BUILT_IN_TEMPLATES, loadCustomTemplates, loadProductDraft, saveProductDraft, upsertHistory } from '../storage';
 import { openThreads } from '../threads';
 import { Draft, Pattern, ProductForm, Template, emptyProduct } from '../types';
-import { Button, Card, Chip, Field, Label, StepTitle, colors, styles } from '../ui';
+import { Button, Card, Chip, Field, Icon, IconName, Label, Pill, Section, Text, colors, styles } from '../ui';
 import ScheduleBox from './ScheduleBox';
 import RewardedButton from '../RewardedButton';
 import { BannerAd } from '../ads';
 
-const TONES = ['カジュアル', '丁寧', '熱量高め', '落ち着いた'];
+const TONES = [
+  { label: 'カジュアル', emoji: '😊' },
+  { label: '丁寧', emoji: '🙇' },
+  { label: '熱量高め', emoji: '🔥' },
+  { label: '落ち着いた', emoji: '🍵' },
+];
+const K_WELCOME = 'welcome_hidden_v1';
 const K_RESULT = 'last_result_v1';
 
 interface Editor extends Draft {
@@ -34,12 +40,24 @@ export default function CreateScreen() {
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [showMore, setShowMore] = useState(false);
+  const [welcomeHidden, setWelcomeHidden] = useState(true);
   const scroll = useRef<ScrollView>(null);
   const resultsY = useRef(0);
   const editorY = useRef(0);
 
+  const hideWelcome = () => {
+    setWelcomeHidden(true);
+    AsyncStorage.setItem(K_WELCOME, '1');
+  };
+
   useEffect(() => {
-    loadProductDraft().then(setProduct);
+    AsyncStorage.getItem(K_WELCOME).then((v) => setWelcomeHidden(v === '1'));
+    loadProductDraft().then((p) => {
+      setProduct(p);
+      // 前回の入力に特徴・届けたい人があれば、くわしい設定を開いておく
+      if (p.description || p.target) setShowMore(true);
+    });
     loadCustomTemplates().then((c) => setTemplates([...BUILT_IN_TEMPLATES, ...c]));
     // Threads アプリに切り替えている間にページが閉じられても、直前の結果を復元する
     AsyncStorage.getItem(K_RESULT).then((raw) => {
@@ -94,6 +112,7 @@ export default function CreateScreen() {
         affiliateUrl: product.affiliateUrl || (looksLikeAffiliate(url) ? url : ''),
       });
       setImage(info.image);
+      if (info.description) setShowMore(true);
       toast('商品情報を読み取りました。内容を確認してください。');
     } catch (e) {
       if (looksLikeAffiliate(url) && !product.affiliateUrl) update({ affiliateUrl: url });
@@ -187,114 +206,222 @@ export default function CreateScreen() {
     toast(message);
   };
 
+  const linkLabel = editor?.linkPlacement === 'reply' ? 'リプ文とリンクをコピー' : 'リンクをコピー';
+
   return (
     <ScrollView ref={scroll} contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+      {!welcomeHidden && (
+        <View style={cs.hero}>
+          <Text style={cs.heroTitle}>商品URLを貼るだけで、{'\n'}紹介ポストが3つできます</Text>
+          <View style={cs.heroSteps}>
+            {[
+              ['link', 'URLを貼る'],
+              ['sparkles', 'AIが3案作成'],
+              ['paper-plane', 'Threadsへ'],
+            ].map(([icon, label], i) => (
+              <View key={label} style={cs.heroStep}>
+                <View style={cs.heroIcon}>
+                  <Icon name={icon as IconName} size={20} color={colors.accent} />
+                </View>
+                <Text style={cs.heroStepText}>
+                  {i + 1}. {label}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Pressable onPress={hideWelcome} style={cs.heroClose} accessibilityLabel="閉じる" hitSlop={10}>
+            <Icon name="close" size={18} color={colors.sub} />
+          </Pressable>
+        </View>
+      )}
+
       {credits === 0 && (
-        <Card style={{ backgroundColor: colors.highlightBg, borderColor: colors.highlightBg }}>
-          <Text style={{ fontWeight: '800', color: colors.text, fontSize: 15 }}>はじめに回数を追加してください</Text>
-          <Text style={[styles.small, { marginTop: 4 }]}>
-            1回の作成で、投稿文を3パターン作れます。購入した回数に期限はありません。
+        <Card style={{ backgroundColor: colors.accentSoft }}>
+          <View style={styles.row}>
+            <Icon name="ticket-outline" size={22} color={colors.accentDark} />
+            <Text style={{ fontWeight: '700', fontSize: 16, marginLeft: 8 }}>まずは回数を追加しましょう</Text>
+          </View>
+          <Text style={[styles.small, { marginTop: 6 }]}>
+            1回で投稿文が3パターンできます。30回300円から。購入した回数に期限はありません。
           </Text>
-          <Button title="回数を購入する" kind="highlight" onPress={() => setTab('settings')} />
+          <Button title="回数を購入する" icon="cart" onPress={() => setTab('settings')} />
           <RewardedButton />
         </Card>
       )}
 
-      <StepTitle n={1} title="商品" />
-      <Label hint="楽天・Yahoo!など。アフィリエイトリンクも可">商品ページの URL</Label>
-      <View style={styles.row}>
+      <Section step={1} icon="bag-handle" title="紹介する商品" subtitle="商品ページのURLを貼って「読み取る」を押すと、商品名や価格が自動で入ります。">
+        <View style={[styles.row, { marginTop: 12 }]}>
+          <Field
+            style={{ flex: 1 }}
+            value={product.url}
+            onChangeText={(url) => update({ url })}
+            placeholder="https:// 商品ページのURL"
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+          <Button title="読み取る" icon="scan" small onPress={readProduct} loading={fetching} style={{ marginLeft: 8, minHeight: 48 }} />
+        </View>
+        <Text style={[styles.small, { marginTop: 6, fontSize: 12 }]}>楽天市場・Yahoo!ショッピングなど。Amazon など読み取れないサイトは手入力でOK</Text>
+
+        {product.name ? (
+          <View style={cs.preview}>
+            {image ? <Image source={{ uri: image }} style={cs.previewImg} /> : (
+              <View style={[cs.previewImg, { alignItems: 'center', justifyContent: 'center' }]}>
+                <Icon name="cube-outline" size={26} color={colors.faint} />
+              </View>
+            )}
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={{ fontWeight: '700' }} numberOfLines={2}>
+                {product.name}
+              </Text>
+              {product.price ? <Text style={{ color: colors.accentDark, fontWeight: '700', marginTop: 4 }}>{product.price}</Text> : null}
+            </View>
+          </View>
+        ) : null}
+
+        <Label hint="必須">商品名</Label>
+        <Field value={product.name} onChangeText={(name) => update({ name })} placeholder="例：折りたたみハンディファン" />
+        <Label optional>価格</Label>
+        <Field value={product.price} onChangeText={(price) => update({ price })} placeholder="例：2,980円" />
+        <Label optional hint="あると体験談として書けます">あなたの感想</Label>
         <Field
-          style={{ flex: 1 }}
-          value={product.url}
-          onChangeText={(url) => update({ url })}
-          placeholder="https://..."
+          multiline
+          value={product.experience}
+          onChangeText={(experience) => update({ experience })}
+          placeholder="例：通勤の電車で使ってる。音が静かで周りを気にしなくていい"
+          maxLength={1000}
+        />
+        <Label hint="投稿に付けるリンク">アフィリエイトリンク</Label>
+        <Field
+          value={product.affiliateUrl}
+          onChangeText={(affiliateUrl) => update({ affiliateUrl })}
+          placeholder="https://hb.afl.rakuten.co.jp/..."
           autoCapitalize="none"
           keyboardType="url"
         />
-        <Button title="読み取る" small onPress={readProduct} loading={fetching} style={{ marginLeft: 8, minHeight: 46 }} />
-      </View>
-      <Text style={[styles.small, { marginTop: 6 }]}>読み取れないサイト（Amazon など）は、下の欄に手入力してください。</Text>
 
-      {image ? <Image source={{ uri: image }} style={{ width: 96, height: 96, borderRadius: 8, marginTop: 12 }} /> : null}
+        <Pressable onPress={() => setShowMore(!showMore)} style={cs.more} accessibilityRole="button">
+          <Text style={{ color: colors.accentDark, fontWeight: '700' }}>{showMore ? 'くわしい設定を閉じる' : 'くわしく設定する（任意）'}</Text>
+          <Icon name={showMore ? 'chevron-up' : 'chevron-down'} size={18} color={colors.accentDark} />
+        </Pressable>
+        {showMore && (
+          <>
+            <Label optional hint="箇条書きでOK">商品の特徴</Label>
+            <Field
+              multiline
+              value={product.description}
+              onChangeText={(description) => update({ description })}
+              placeholder="例：重さ180g / USB充電で8時間 / 3段階の風量"
+              maxLength={2000}
+            />
+            <Label optional>届けたい人</Label>
+            <Field value={product.target} onChangeText={(target) => update({ target })} placeholder="例：暑がりの会社員" />
+          </>
+        )}
+      </Section>
 
-      <Label hint="必須">商品名</Label>
-      <Field value={product.name} onChangeText={(name) => update({ name })} placeholder="例: 折りたたみ電動ミニファン" />
-      <Label>価格</Label>
-      <Field value={product.price} onChangeText={(price) => update({ price })} placeholder="例: 2,980円" />
-      <Label hint="箇条書きでOK">商品の特徴</Label>
-      <Field
-        multiline
-        value={product.description}
-        onChangeText={(description) => update({ description })}
-        placeholder="例: 重さ180g / USB充電で8時間 / 3段階の風量"
-        maxLength={2000}
-      />
-      <Label hint="任意。あると体験談として書けます">あなたの使用感</Label>
-      <Field
-        multiline
-        value={product.experience}
-        onChangeText={(experience) => update({ experience })}
-        placeholder="例: 通勤の電車で使ってる。音が静かで周りを気にしなくていい"
-        maxLength={1000}
-      />
-      <Label hint="任意">届けたい人</Label>
-      <Field value={product.target} onChangeText={(target) => update({ target })} placeholder="例: 暑がりの会社員" />
-      <Label hint="投稿に付けるリンク">アフィリエイトリンク</Label>
-      <Field
-        value={product.affiliateUrl}
-        onChangeText={(affiliateUrl) => update({ affiliateUrl })}
-        placeholder="https://hb.afl.rakuten.co.jp/..."
-        autoCapitalize="none"
-        keyboardType="url"
-      />
-
-      <StepTitle n={2} title="書き方" />
-      <Label>テンプレート</Label>
-      <View style={styles.chips}>
-        {templates.map((t) => (
-          <Chip key={t.id} label={t.name} active={t.id === template.id} onPress={() => updateSettings({ templateId: t.id })} />
-        ))}
-      </View>
-      <Text style={styles.small}>{template.instruction}</Text>
-      <Label>トーン</Label>
-      <View style={styles.chips}>
-        {TONES.map((t) => (
-          <Chip key={t} label={t} active={settings.tone === t} onPress={() => updateSettings({ tone: t })} />
-        ))}
-      </View>
-      <Label>リンクの位置</Label>
-      <View style={styles.chips}>
-        <Chip label="投稿にリンクを付ける" active={settings.linkPlacement === 'body'} onPress={() => updateSettings({ linkPlacement: 'body' })} />
-        <Chip label="リプ欄に貼る" active={settings.linkPlacement === 'reply'} onPress={() => updateSettings({ linkPlacement: 'reply' })} />
-      </View>
-
-      <StepTitle n={3} title="作成" />
-      <Button
-        title={patterns.length ? '別の案を作る（1回分）' : '投稿文を3パターン作る（1回分）'}
-        onPress={run}
-        loading={generating}
-      />
-      <Text style={[styles.small, { textAlign: 'center', marginTop: 6 }]}>
-        残り {credits ?? '—'} 回{generating ? '　作成中…（10秒ほどかかります）' : ''}
-      </Text>
-
-      {patterns.length > 0 && (
-        <View onLayout={(e) => (resultsY.current = e.nativeEvent.layout.y)}>
-          <Label>使う案を選んでください</Label>
-          {patterns.map((p, i) => (
-            <Pressable key={i} onPress={() => toEditor(p, i)} accessibilityRole="button">
-              <Card style={selected === i ? { borderColor: colors.highlight, borderWidth: 2 } : undefined}>
-                <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 6 }]}>
-                  <Text style={{ fontWeight: '800', color: colors.highlight }}>
-                    案{i + 1}　{p.angle}
-                  </Text>
-                  <Text style={styles.small}>{charCount(withDisclosure(p.body, settings.disclosure))}文字</Text>
-                </View>
-                <Text style={{ fontSize: 15, lineHeight: 23, color: colors.text }}>{p.body}</Text>
-                {p.reply ? <Text style={[styles.small, { marginTop: 8 }]}>リプ: {p.reply}</Text> : null}
-              </Card>
+      <Section step={2} icon="color-palette" title="書き方を選ぶ">
+        <Label>テンプレート</Label>
+        <View style={cs.grid}>
+          {templates.map((t) => {
+            const on = t.id === template.id;
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => updateSettings({ templateId: t.id })}
+                style={[cs.tpl, on && cs.tplOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+              >
+                <Text style={{ fontSize: 22 }}>{t.emoji ?? '✏️'}</Text>
+                <Text style={[{ fontSize: 13, marginTop: 4, textAlign: 'center' }, on && { fontWeight: '700', color: colors.accentDark }]} numberOfLines={1}>
+                  {t.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={[styles.small, { fontSize: 12 }]}>{template.instruction}</Text>
+        <Label>トーン</Label>
+        <View style={styles.chips}>
+          {TONES.map((t) => (
+            <Chip key={t.label} icon={t.emoji} label={t.label} active={settings.tone === t.label} onPress={() => updateSettings({ tone: t.label })} />
+          ))}
+        </View>
+        <Label>リンクの位置</Label>
+        <View style={cs.segment}>
+          {(
+            [
+              ['body', '投稿に付ける'],
+              ['reply', 'リプ欄に貼る'],
+            ] as const
+          ).map(([k, label]) => (
+            <Pressable
+              key={k}
+              onPress={() => updateSettings({ linkPlacement: k })}
+              style={[cs.segItem, settings.linkPlacement === k && cs.segOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: settings.linkPlacement === k }}
+            >
+              <Text style={[{ fontSize: 14 }, settings.linkPlacement === k && { fontWeight: '700', color: colors.accentDark }]}>{label}</Text>
             </Pressable>
           ))}
+        </View>
+      </Section>
+
+      <View style={{ marginTop: 8 }}>
+        <Button
+          title={patterns.length ? '別の案を作る' : '投稿文を3つ作る'}
+          icon="sparkles"
+          onPress={run}
+          loading={generating}
+          style={{ minHeight: 58 }}
+        />
+        <Text style={[styles.small, { textAlign: 'center', marginTop: 8 }]}>1回分を使います（残り {credits ?? '—'} 回）</Text>
+      </View>
+
+      {generating && (
+        <Card style={{ alignItems: 'center', paddingVertical: 24 }}>
+          <Icon name="sparkles" size={28} color={colors.accent} />
+          <Text style={{ fontWeight: '700', marginTop: 8 }}>AIが紹介文を考えています…</Text>
+          <Text style={[styles.small, { marginTop: 4 }]}>10秒ほどお待ちください</Text>
+        </Card>
+      )}
+
+      {patterns.length > 0 && !generating && (
+        <View onLayout={(e) => (resultsY.current = e.nativeEvent.layout.y)} style={{ marginTop: 20 }}>
+          <View style={[styles.row, { marginBottom: 2 }]}>
+            <Icon name="checkmark-circle" size={22} color={colors.ok} />
+            <Text style={{ fontSize: 18, fontWeight: '700', marginLeft: 6 }}>3つの案ができました</Text>
+          </View>
+          <Text style={styles.small}>使いたい案をタップしてください</Text>
+          {patterns.map((p, i) => {
+            const on = selected === i;
+            return (
+              <Pressable key={i} onPress={() => toEditor(p, i)} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                <Card style={on ? cs.postOn : undefined}>
+                  <View style={styles.row}>
+                    <View style={cs.avatar}>
+                      <Icon name="person" size={16} color="#fff" />
+                    </View>
+                    <Text style={{ fontWeight: '700', marginLeft: 8, flex: 1 }}>あなた</Text>
+                    <Pill label={`案${i + 1}・${p.angle}`} tone={on ? 'warn' : 'neutral'} />
+                  </View>
+                  <Text style={cs.postBody}>{withDisclosure(p.body, settings.disclosure)}</Text>
+                  {p.reply ? (
+                    <View style={cs.replyBox}>
+                      <Icon name="return-down-forward" size={14} color={colors.sub} />
+                      <Text style={[styles.small, { marginLeft: 6, flex: 1 }]}>{p.reply}</Text>
+                    </View>
+                  ) : null}
+                  <View style={[styles.row, { justifyContent: 'space-between', marginTop: 10 }]}>
+                    <Text style={[styles.small, { fontSize: 12 }]}>{charCount(withDisclosure(p.body, settings.disclosure))}文字</Text>
+                    <Text style={{ color: colors.accentDark, fontWeight: '700', fontSize: 13 }}>{on ? '選択中' : 'この案を使う ›'}</Text>
+                  </View>
+                </Card>
+              </Pressable>
+            );
+          })}
           <View style={{ marginTop: 12 }}>
             <BannerAd />
           </View>
@@ -302,23 +429,32 @@ export default function CreateScreen() {
       )}
 
       {editor && (
-        <View onLayout={(e) => (editorY.current = e.nativeEvent.layout.y)}>
-          <StepTitle n={4} title="編集して投稿" />
-          <Field multiline value={editor.text} onChangeText={(text) => setEditor({ ...editor, text })} style={{ minHeight: 200, lineHeight: 23 }} />
-          <View style={[styles.row, { justifyContent: 'space-between', marginTop: 6 }]}>
-            <Text style={[styles.small, !hasDisclosure(editor.text) && { color: colors.danger }]}>
-              {hasDisclosure(editor.text) ? '広告表記あり' : '広告表記がありません'}
-            </Text>
-            <Text style={[styles.small, tooLong && { color: colors.danger, fontWeight: '700' }]}>
-              {count} / {THREADS_MAX_CHARS}
-            </Text>
+        <Section step={3} icon="paper-plane" title="仕上げて投稿" onLayout={(y) => (editorY.current = y)}>
+          <Text style={[styles.small, { marginTop: 2 }]}>そのまま使っても、自分の言葉に直してもOKです。</Text>
+          <Field
+            multiline
+            value={editor.text}
+            onChangeText={(text) => setEditor({ ...editor, text })}
+            style={{ minHeight: 220, lineHeight: 24, marginTop: 12 }}
+          />
+          <View style={[styles.row, { flexWrap: 'wrap' }]}>
+            <Pill
+              icon={hasDisclosure(editor.text) ? 'checkmark-circle' : 'alert-circle'}
+              label={hasDisclosure(editor.text) ? '広告表記あり' : '広告表記がありません'}
+              tone={hasDisclosure(editor.text) ? 'ok' : 'danger'}
+            />
+            <Pill icon="text" label={`${count} / ${THREADS_MAX_CHARS}文字`} tone={tooLong ? 'danger' : 'neutral'} />
+            {warnings.length === 0 && <Pill icon="shield-checkmark" label="表現チェックOK" tone="ok" />}
           </View>
 
           {warnings.length > 0 && (
-            <Card style={{ backgroundColor: colors.warnBg, borderColor: colors.warnBg }}>
-              <Text style={{ fontWeight: '700', color: colors.warn, marginBottom: 4 }}>表現のチェック</Text>
+            <Card style={{ backgroundColor: colors.warnBg, marginTop: 10 }}>
+              <View style={styles.row}>
+                <Icon name="warning" size={18} color={colors.warn} />
+                <Text style={{ fontWeight: '700', color: colors.warn, marginLeft: 6 }}>言い換えをおすすめする表現</Text>
+              </View>
               {warnings.map((w) => (
-                <Text key={w.word} style={[styles.small, { color: colors.warn }]}>
+                <Text key={w.word} style={[styles.small, { color: colors.warn, marginTop: 4 }]}>
                   「{w.word}」… {w.reason}
                 </Text>
               ))}
@@ -327,29 +463,30 @@ export default function CreateScreen() {
 
           {editor.linkPlacement === 'reply' && (
             <>
-              <Label hint="リンクと一緒に、自分の投稿へのリプで使います">リプ用の一言</Label>
+              <Label hint="リンクと一緒にリプで使います">リプ用の一言</Label>
               <Field value={editor.reply} onChangeText={(reply) => setEditor({ ...editor, reply })} />
             </>
           )}
-          <Label>リンク</Label>
+          <Label optional>リンク</Label>
           <Field
             value={editor.link}
             onChangeText={(link) => setEditor({ ...editor, link })}
-            placeholder="アフィリエイトリンク（任意）"
+            placeholder="アフィリエイトリンク"
             autoCapitalize="none"
             keyboardType="url"
           />
-          <Label hint="Threads のトピックタグ（任意）">トピック</Label>
+          <Label optional hint="Threads のトピック">トピック</Label>
           <Field value={editor.topic} onChangeText={(topic) => setEditor({ ...editor, topic })} maxLength={50} />
 
-          <Button title="Threads で投稿画面を開く" kind="highlight" onPress={post} />
-          <Text style={[styles.small, { textAlign: 'center', marginTop: 6 }]}>
-            文章とリンクが入った状態で Threads が開きます。内容を確認して投稿してください。
+          <Button title="Threads で投稿する" icon="paper-plane" onPress={post} style={{ marginTop: 18, minHeight: 56 }} />
+          <Text style={[styles.small, { textAlign: 'center', marginTop: 6, fontSize: 12 }]}>
+            文章とリンクが入った Threads の投稿画面が開きます。内容を確認して投稿してください。
           </Text>
           <View style={[styles.row, { gap: 8, marginTop: 4 }]}>
-            <Button title="本文をコピー" kind="secondary" style={{ flex: 1 }} onPress={() => copy(editor.text, '本文をコピーしました。')} />
+            <Button title="コピー" icon="copy-outline" kind="secondary" style={{ flex: 1 }} onPress={() => copy(editor.text, '本文をコピーしました。')} />
             <Button
-              title={editor.favorite ? '★ 保存済み' : '☆ お気に入り'}
+              title={editor.favorite ? '保存済み' : 'お気に入り'}
+              icon={editor.favorite ? 'heart' : 'heart-outline'}
               kind="secondary"
               style={{ flex: 1 }}
               onPress={async () => {
@@ -360,16 +497,51 @@ export default function CreateScreen() {
           </View>
           {editor.link ? (
             <Button
-              title={editor.linkPlacement === 'reply' ? 'リプ文とリンクをコピー' : 'リンクをコピー'}
-              kind="secondary"
+              title={linkLabel}
+              icon="link"
+              kind="ghost"
               onPress={() =>
                 copy(editor.linkPlacement === 'reply' ? `${editor.reply}\n${editor.link}`.trim() : editor.link, 'コピーしました。')
               }
             />
           ) : null}
           <ScheduleBox draft={editor} onScheduled={() => save({})} />
-        </View>
+        </Section>
       )}
     </ScrollView>
   );
 }
+
+const cs = StyleSheet.create({
+  hero: { backgroundColor: colors.accentSoft, borderRadius: 24, padding: 18, paddingRight: 40 },
+  heroTitle: { fontSize: 18, fontWeight: '700', lineHeight: 27 },
+  heroSteps: { flexDirection: 'row', marginTop: 14, gap: 8 },
+  heroStep: { flex: 1, alignItems: 'center' },
+  heroIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  heroStepText: { fontSize: 12, marginTop: 6, fontWeight: '700', color: colors.sub },
+  heroClose: { position: 'absolute', top: 12, right: 12 },
+  preview: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9F5', borderRadius: 16, padding: 10, marginTop: 14 },
+  previewImg: { width: 64, height: 64, borderRadius: 12, backgroundColor: '#F4ECE5' },
+  more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, paddingVertical: 8, gap: 4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  tpl: {
+    width: '31%',
+    minWidth: 92,
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  tplOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  segment: { flexDirection: 'row', backgroundColor: '#F6EEE7', borderRadius: 16, padding: 4 },
+  segItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12 },
+  segOn: { backgroundColor: colors.card },
+  avatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  postBody: { fontSize: 15, lineHeight: 24, marginTop: 10 },
+  postOn: { borderWidth: 2, borderColor: colors.accent },
+  replyBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#FAF4EF', borderRadius: 12, padding: 10, marginTop: 10 },
+});

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, Linking, ScrollView, Text, View } from 'react-native';
+import { AppState, Linking, ScrollView, View, Pressable, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../AppContext';
 import { fetchBalance } from '../api';
@@ -7,7 +7,7 @@ import { API_BASE, LEGAL_PAGES, WEB_PACKS } from '../config';
 import { DISCLOSURE_LABEL } from '../compliance';
 import { ID_RE, getInstallId, setInstallId } from '../storage';
 import { DisclosureStyle } from '../types';
-import { Button, Card, Chip, Field, Label, colors, styles } from '../ui';
+import { Button, Chip, Field, colors, styles, Text, Icon, Section } from '../ui';
 import AutopostSettings from './AutopostSettings';
 import RewardedButton from '../RewardedButton';
 
@@ -71,58 +71,78 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
-      <Card style={{ marginTop: 0 }}>
-        <Text style={styles.small}>残り回数</Text>
-        <Text style={{ fontSize: 32, fontWeight: '800', color: colors.text }}>{credits ?? '—'} 回</Text>
+      <View style={ss.hero}>
+        <View style={styles.row}>
+          <Icon name="ticket" size={18} color="#fff" />
+          <Text style={ss.heroLabel}>残り回数</Text>
+        </View>
+        <Text style={ss.heroNum}>
+          {credits ?? '—'}
+          <Text style={ss.heroUnit}> 回</Text>
+        </Text>
         {freeCredits > 0 && (
-          <Text style={[styles.small, { marginTop: 2 }]}>
-            購入分 {paidCredits ?? 0} 回 ／ 無料分 {freeCredits} 回（無料分は文章の作成だけに使えます）
+          <Text style={ss.heroSub}>
+            購入分 {paidCredits ?? 0} 回 ／ 無料分 {freeCredits} 回
           </Text>
         )}
-        <Text style={[styles.small, { marginTop: 4 }]}>
-          1回の作成で投稿文を3パターン作れます。作成に失敗したときは消費されません。購入した回数に有効期限はありません。
-        </Text>
-      </Card>
-
-      <Label>回数を追加</Label>
-      {WEB_PACKS.length ? (
-        <>
-          {WEB_PACKS.map((p) => (
-            <Button key={p.url} title={p.label} kind="highlight" onPress={() => buy(p.url)} />
-          ))}
-          <Text style={[styles.small, { marginTop: 8 }]}>
-            決済ページ（Stripe）が開きます。お支払い完了後にこの画面へ戻ると、回数が反映されます。
-          </Text>
-        </>
-      ) : (
-        <Text style={styles.small}>現在、購入の受付を停止しています。</Text>
-      )}
-      <RewardedButton />
-      {__DEV__ && <Button title="（開発用）10回付与" kind="secondary" onPress={devGrant} />}
-
-      <Label>広告表記</Label>
-      <View style={styles.chips}>
-        {(Object.keys(DISCLOSURE_LABEL) as DisclosureStyle[]).map((k) => (
-          <Chip key={k} label={DISCLOSURE_LABEL[k]} active={settings.disclosure === k} onPress={() => updateSettings({ disclosure: k })} />
-        ))}
+        <Text style={ss.heroSub}>1回で投稿文が3パターンできます。失敗したときは減りません。</Text>
       </View>
-      <Text style={styles.small}>
-        アフィリエイトの紹介投稿には、広告であることが分かる表記が必要です（ステルスマーケティング規制）。分かりやすい先頭の【PR】がおすすめです。
-      </Text>
+
+      <Section icon="cart" title="回数を追加" subtitle="購入した回数に有効期限はありません。月額料金もかかりません。">
+        {WEB_PACKS.length ? (
+          <>
+            <View style={ss.packs}>
+              {WEB_PACKS.map((p, i) => {
+                const [count, price] = p.label.split(/\s+/);
+                const n = Number(count.replace(/\D/g, ''));
+                const yen = Number((price ?? '').replace(/\D/g, ''));
+                const best = i === WEB_PACKS.length - 1 && WEB_PACKS.length > 1;
+                return (
+                  <Pressable key={p.url} onPress={() => buy(p.url)} style={[ss.pack, best && ss.packBest]} accessibilityRole="button">
+                    {best ? <Text style={ss.badge}>おトク</Text> : null}
+                    <Text style={ss.packCount}>{count}</Text>
+                    <Text style={ss.packPrice}>{price}</Text>
+                    {n && yen ? <Text style={styles.small}>1回あたり {Math.round((yen / n) * 10) / 10}円</Text> : null}
+                    <View style={ss.packBtn}>
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>購入する</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[styles.small, { marginTop: 10, fontSize: 12 }]}>
+              決済ページ（Stripe）が開きます。お支払い後にこの画面へ戻ると、回数が反映されます。
+            </Text>
+          </>
+        ) : (
+          <Text style={[styles.small, { marginTop: 8 }]}>現在、購入の受付を停止しています。</Text>
+        )}
+        <RewardedButton />
+        {__DEV__ && <Button title="（開発用）10回付与" kind="ghost" small onPress={devGrant} style={{ marginTop: 8 }} />}
+      </Section>
+
+      <Section icon="megaphone" title="広告表記" subtitle="アフィリエイトの紹介投稿には、広告だと分かる表記が必要です（ステマ規制）。">
+        <View style={[styles.chips, { marginTop: 12 }]}>
+          {(Object.keys(DISCLOSURE_LABEL) as DisclosureStyle[]).map((k) => (
+            <Chip key={k} label={DISCLOSURE_LABEL[k]} active={settings.disclosure === k} onPress={() => updateSettings({ disclosure: k })} />
+          ))}
+        </View>
+        <Text style={[styles.small, { fontSize: 12 }]}>分かりやすい「先頭に【PR】」がおすすめです。</Text>
+      </Section>
 
       <AutopostSettings />
 
-      <Label hint="機種変更やブラウザを変えるときに使います">引き継ぎコード</Label>
-      <Card style={{ marginTop: 0 }}>
-        <Text selectable style={{ fontFamily: 'monospace', color: colors.text, fontSize: 13 }}>
-          {installId}
-        </Text>
-        <Text style={[styles.small, { marginTop: 6 }]}>
-          購入した回数はこのコードに記録されています。人に教えないでください。スクリーンショットなどで控えておくと、別の端末でも使えます。
-        </Text>
-        <View style={[styles.row, { gap: 8, marginTop: 10 }]}>
+      <Section icon="key" title="引き継ぎコード" subtitle="機種変更やブラウザを変えるときに使います。購入した回数はこのコードに記録されています。">
+        <View style={ss.code}>
+          <Text selectable style={{ fontSize: 13, letterSpacing: 0.3 }}>
+            {installId}
+          </Text>
+        </View>
+        <Text style={[styles.small, { fontSize: 12 }]}>人に教えないでください。スクリーンショットなどで控えておくと安心です。</Text>
+        <View style={[styles.row, { gap: 8, marginTop: 10, flexWrap: 'wrap' }]}>
           <Button
             title="コピー"
+            icon="copy-outline"
             small
             kind="secondary"
             onPress={async () => {
@@ -130,34 +150,87 @@ export default function SettingsScreen() {
               toast('引き継ぎコードをコピーしました。');
             }}
           />
-          <Button title="別の端末から引き継ぐ" small kind="secondary" onPress={() => setShowRestore(!showRestore)} />
+          <Button title="別の端末から引き継ぐ" icon="swap-horizontal" small kind="secondary" onPress={() => setShowRestore(!showRestore)} />
         </View>
         {showRestore && (
           <>
             <Field
-              style={{ marginTop: 10 }}
+              style={{ marginTop: 12 }}
               value={restore}
               onChangeText={setRestore}
               placeholder="以前の端末の引き継ぎコード"
               autoCapitalize="none"
             />
-            <Text style={[styles.small, { marginTop: 6 }]}>
+            <Text style={[styles.small, { marginTop: 6, fontSize: 12 }]}>
               引き継ぐと、この端末の今のコード（残り {credits ?? 0} 回）は使えなくなります。必要なら先に控えてください。
             </Text>
             <Button title="引き継ぐ" onPress={applyRestore} />
           </>
         )}
-      </Card>
+      </Section>
 
-      <Label>このアプリについて</Label>
-      <View style={styles.chips}>
-        {LEGAL_PAGES.map((p) => (
-          <Chip key={p.path} label={p.label} active={false} onPress={() => Linking.openURL(`${API_BASE}${p.path}`)} />
-        ))}
-      </View>
-      <Text style={[styles.small, { marginTop: 8 }]}>
-        作成した文章や商品情報、履歴はこの端末の中にだけ保存されます。通常の投稿は Threads の公式の投稿画面から、ご自身で行います。
-      </Text>
+      <Section icon="information-circle" title="このアプリについて">
+        <View style={{ marginTop: 8 }}>
+          {LEGAL_PAGES.map((p, i) => (
+            <Pressable
+              key={p.path}
+              onPress={() => Linking.openURL(`${API_BASE}${p.path}`)}
+              style={[ss.linkRow, i === LEGAL_PAGES.length - 1 && { borderBottomWidth: 0 }]}
+              accessibilityRole="link"
+            >
+              <Text style={{ fontSize: 15 }}>{p.label}</Text>
+              <Icon name="chevron-forward" size={18} color={colors.faint} />
+            </Pressable>
+          ))}
+        </View>
+        <Text style={[styles.small, { marginTop: 8, fontSize: 12 }]}>
+          作成した文章・商品情報・履歴はこの端末の中にだけ保存されます。
+        </Text>
+      </Section>
     </ScrollView>
   );
 }
+
+const ss = StyleSheet.create({
+  hero: { backgroundColor: colors.accent, borderRadius: 24, padding: 20 },
+  heroLabel: { color: '#fff', fontWeight: '700', marginLeft: 6 },
+  heroNum: { color: '#fff', fontSize: 44, fontWeight: '700', marginTop: 4 },
+  heroUnit: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  heroSub: { color: 'rgba(255,255,255,0.92)', fontSize: 13, marginTop: 4, lineHeight: 19 },
+  packs: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  pack: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    backgroundColor: '#FFFCFA',
+  },
+  packBest: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  badge: {
+    position: 'absolute',
+    top: -10,
+    backgroundColor: colors.accent,
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  packCount: { fontSize: 22, fontWeight: '700' },
+  packPrice: { fontSize: 16, fontWeight: '700', color: colors.accentDark, marginTop: 2, marginBottom: 4 },
+  packBtn: { backgroundColor: colors.accent, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 16, marginTop: 10 },
+  code: { backgroundColor: '#FAF4EF', borderRadius: 12, padding: 12, marginTop: 12, marginBottom: 6 },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+});

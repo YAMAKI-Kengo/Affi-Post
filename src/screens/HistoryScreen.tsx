@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../AppContext';
 import { loadHistory, removeHistory, upsertHistory } from '../storage';
 import { HistoryItem } from '../types';
-import { Button, Card, Chip, colors, formatDate, styles } from '../ui';
+import { Button, Card, Chip, EmptyState, Icon, Pill, Text, colors, formatDate, styles } from '../ui';
 import ScheduledList from './ScheduledList';
 
 export default function HistoryScreen() {
@@ -32,17 +32,19 @@ export default function HistoryScreen() {
         <>
           <View style={styles.chips}>
             <Chip label={`すべて（${items.length}）`} active={mode === 'all'} onPress={() => setMode('all')} />
-            <Chip label={`★ お気に入り（${items.filter((i) => i.favorite).length}）`} active={onlyFav} onPress={() => setMode('fav')} />
-            {account?.connected && <Chip label="⏰ 予約" active={mode === 'scheduled'} onPress={() => setMode('scheduled')} />}
+            <Chip icon="❤️" label={`お気に入り（${items.filter((i) => i.favorite).length}）`} active={onlyFav} onPress={() => setMode('fav')} />
+            {account?.connected && <Chip icon="⏰" label="予約" active={mode === 'scheduled'} onPress={() => setMode('scheduled')} />}
           </View>
           {mode === 'scheduled' && tab === 'history' && <ScheduledList />}
         </>
       }
       ListEmptyComponent={
         mode === 'scheduled' ? null : (
-        <Text style={[styles.small, { textAlign: 'center', marginTop: 40 }]}>
-          {onlyFav ? 'お気に入りはまだありません。' : 'Threads で開いた・コピーした投稿がここに残ります。'}
-        </Text>
+        onlyFav ? (
+          <EmptyState icon="heart-outline" title="お気に入りはまだありません" message="気に入った投稿文は、作成画面の「お気に入り」で保存できます。" />
+        ) : (
+          <EmptyState icon="document-text-outline" title="まだ履歴はありません" message="Threads で開いたり、コピーしたりした投稿文がここに残ります。あとから編集して使い回せます。" />
+        )
         )
       }
       renderItem={({ item }) => (
@@ -52,19 +54,21 @@ export default function HistoryScreen() {
               {item.productName || '（商品名なし）'}
             </Text>
             <Pressable onPress={() => toggleFav(item)} hitSlop={10} accessibilityLabel="お気に入り">
-              <Text style={{ fontSize: 20, color: item.favorite ? colors.highlight : colors.faint }}>{item.favorite ? '★' : '☆'}</Text>
+              <Icon name={item.favorite ? 'heart' : 'heart-outline'} size={22} color={item.favorite ? colors.accent : colors.faint} />
             </Pressable>
           </View>
-          <Text style={[styles.small, { marginTop: 2 }]}>
-            {formatDate(item.at)}　{item.posted ? 'Threads で開いた' : 'コピーのみ'}
-          </Text>
-          <Text style={{ marginTop: 8, color: colors.text, lineHeight: 21 }} numberOfLines={5}>
+          <View style={[styles.row, { flexWrap: 'wrap' }]}>
+            <Pill icon="calendar-outline" label={formatDate(item.at)} />
+            <Pill icon={item.posted ? 'paper-plane' : 'copy-outline'} label={item.posted ? 'Threads で開いた' : 'コピーのみ'} tone={item.posted ? 'ok' : 'neutral'} />
+          </View>
+          <Text style={{ marginTop: 10, lineHeight: 22 }} numberOfLines={5}>
             {item.text}
           </Text>
           <View style={[styles.row, { gap: 8, marginTop: 10, flexWrap: 'wrap' }]}>
-            <Button title="編集して使う" small onPress={() => openInEditor(item)} />
+            <Button title="編集して使う" icon="create-outline" small onPress={() => openInEditor(item)} />
             <Button
               title="コピー"
+              icon="copy-outline"
               small
               kind="secondary"
               onPress={async () => {
@@ -83,7 +87,7 @@ export default function HistoryScreen() {
                 }}
               />
             ) : (
-              <Button title="削除" small kind="secondary" onPress={() => setConfirmId(item.id)} />
+              <Button title="削除" icon="trash-outline" small kind="ghost" onPress={() => setConfirmId(item.id)} />
             )}
           </View>
         </Card>

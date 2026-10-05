@@ -71,30 +71,35 @@ export async function removeHistory(id: string) {
 export const BUILT_IN_TEMPLATES: Template[] = [
   {
     id: 'review',
+    emoji: '📝',
     name: '体験レビュー',
     instruction: '使ってみた感想を中心に、良かった点と、人によっては気になる点も正直に書く',
     builtIn: true,
   },
   {
     id: 'problem',
+    emoji: '💡',
     name: '悩み解決',
     instruction: '読者がよく抱える悩みから書き出し、この商品でどう楽になるかを具体的に書く',
     builtIn: true,
   },
   {
     id: 'howto',
+    emoji: '🪄',
     name: '使い方提案',
     instruction: '具体的な使用シーンや、意外な活用法を紹介する',
     builtIn: true,
   },
   {
     id: 'deal',
+    emoji: '🏷️',
     name: 'お得情報',
     instruction: '価格やお得さに触れて紹介する。セール期間や割引率は入力された情報だけを使い、急がせる煽り文句は使わない',
     builtIn: true,
   },
   {
     id: 'compare',
+    emoji: '⚖️',
     name: '選び方・比較',
     instruction: '同じジャンルの商品を選ぶときのポイントを示し、この商品がどんな人に合うかを書く',
     builtIn: true,

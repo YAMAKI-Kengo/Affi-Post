@@ -1,20 +1,20 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, Tab, useApp } from './src/AppContext';
-import { colors } from './src/ui';
+import { Icon, IconName, Text, colors } from './src/ui';
 import CreateScreen from './src/screens/CreateScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import TemplatesScreen from './src/screens/TemplatesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import { BannerAd } from './src/ads';
 
-const TABS: { key: Tab; label: string; icon: string; title: string }[] = [
-  { key: 'create', label: '作成', icon: '✎', title: 'アフィポ' },
-  { key: 'history', label: '履歴', icon: '↺', title: '履歴・お気に入り' },
-  { key: 'templates', label: 'テンプレ', icon: '▤', title: 'テンプレート' },
-  { key: 'settings', label: '設定', icon: '⚙', title: '回数・設定' },
+const TABS: { key: Tab; label: string; icon: IconName; iconOn: IconName; title: string }[] = [
+  { key: 'create', label: 'つくる', icon: 'create-outline', iconOn: 'create', title: 'アフィポ' },
+  { key: 'history', label: '履歴', icon: 'time-outline', iconOn: 'time', title: '履歴・お気に入り' },
+  { key: 'templates', label: 'テンプレ', icon: 'albums-outline', iconOn: 'albums', title: 'テンプレート' },
+  { key: 'settings', label: '回数・設定', icon: 'settings-outline', iconOn: 'settings', title: '回数・設定' },
 ];
 
 function Shell() {
@@ -23,8 +23,12 @@ function Shell() {
   return (
     <SafeAreaView style={st.root} edges={['top', 'bottom']}>
       <View style={st.header}>
-        <Text style={st.headerTitle}>{current.title}</Text>
-        <Pressable onPress={() => setTab('settings')} style={st.badge} accessibilityRole="button">
+        <View style={st.brand}>
+          {tab === 'create' ? <Image source={require('./assets/icon.png')} style={st.logo} /> : null}
+          <Text style={st.headerTitle}>{current.title}</Text>
+        </View>
+        <Pressable onPress={() => setTab('settings')} style={st.badge} accessibilityRole="button" accessibilityLabel="残り回数">
+          <Icon name="ticket" size={15} color={colors.accent} />
           <Text style={st.badgeText}>残り {credits ?? '—'} 回</Text>
         </Pressable>
       </View>
@@ -46,18 +50,23 @@ function Shell() {
       {/* バナー広告は入力の邪魔にならないよう、作成画面以外の下にだけ出す（広告の設定がなければ何も出ない） */}
       {tab !== 'create' && <BannerAd key={tab} />}
       <View style={st.tabBar}>
-        {TABS.map((t) => (
-          <Pressable
-            key={t.key}
-            style={st.tabItem}
-            onPress={() => setTab(t.key)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tab === t.key }}
-          >
-            <Text style={[st.tabIcon, tab === t.key && { color: colors.text }]}>{t.icon}</Text>
-            <Text style={[st.tabLabel, tab === t.key && { color: colors.text, fontWeight: '700' }]}>{t.label}</Text>
-          </Pressable>
-        ))}
+        {TABS.map((t) => {
+          const on = tab === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              style={st.tabItem}
+              onPress={() => setTab(t.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+            >
+              <View style={[st.tabIconWrap, on && { backgroundColor: colors.accentSoft }]}>
+                <Icon name={on ? t.iconOn : t.icon} size={22} color={on ? colors.accent : colors.faint} />
+              </View>
+              <Text style={[st.tabLabel, on && { color: colors.accentDark, fontWeight: '700' }]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
     </SafeAreaView>
   );
@@ -77,29 +86,39 @@ export default function App() {
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   header: {
-    height: 52,
+    height: 58,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.bg,
   },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
-  badge: { backgroundColor: colors.highlightBg, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
-  badgeText: { color: colors.highlight, fontWeight: '700', fontSize: 13 },
-  page: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  brand: { flexDirection: 'row', alignItems: 'center' },
+  logo: { width: 30, height: 30, borderRadius: 9, marginRight: 8 },
+  headerTitle: { fontSize: 20, fontWeight: '700' },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1.5,
+    borderColor: colors.accentSoft,
+  },
+  badgeText: { color: colors.accentDark, fontWeight: '700', fontSize: 13, marginLeft: 5 },
+  page: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   hidden: { display: 'none' },
   tabBar: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     backgroundColor: colors.card,
     paddingTop: 6,
-    paddingBottom: 4,
+    paddingBottom: 6,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 -2px 12px rgba(120, 72, 40, 0.06)' } as object) : { elevation: 8 }),
   },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 2, minHeight: 48, justifyContent: 'center' },
-  tabIcon: { fontSize: 20, color: colors.faint },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  tabIconWrap: { width: 44, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   tabLabel: { fontSize: 11, color: colors.faint, marginTop: 2 },
 });

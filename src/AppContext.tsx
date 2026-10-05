@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
 import { AdStatus, Balance, ThreadsAccount, fetchBalance, fetchThreadsAccount } from './api';
 import { loadSettings, saveSettings } from './storage';
 import { AppSettings, HistoryItem, defaultSettings } from './types';
+import { Text } from './ui';
 
 export type Tab = 'create' | 'history' | 'templates' | 'settings';
 

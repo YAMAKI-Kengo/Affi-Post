@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useApp } from '../AppContext';
 import { BUILT_IN_TEMPLATES, loadCustomTemplates, saveCustomTemplates } from '../storage';
 import { Template } from '../types';
-import { Button, Card, Field, Label, colors, styles } from '../ui';
+import { Button, Card, Field, Label, colors, styles, Text, Pill } from '../ui';
 
 const MAX_TEMPLATES = 20;
 
@@ -39,10 +39,14 @@ export default function TemplatesScreen() {
 
   const row = (t: Template) => (
     <Card key={t.id} style={t.id === settings.templateId ? { borderColor: colors.highlight, borderWidth: 2 } : undefined}>
-      <Text style={{ fontWeight: '800', color: colors.text }}>{t.name}</Text>
-      <Text style={[styles.small, { marginTop: 4 }]}>{t.instruction}</Text>
+      <View style={styles.row}>
+        <Text style={{ fontSize: 22, marginRight: 8 }}>{t.emoji ?? '✏️'}</Text>
+        <Text style={{ fontWeight: '700', fontSize: 16, flex: 1 }}>{t.name}</Text>
+        {t.id === settings.templateId ? <Pill icon="checkmark-circle" label="選択中" tone="ok" /> : null}
+      </View>
+      <Text style={[styles.small, { marginTop: 6 }]}>{t.instruction}</Text>
       <View style={[styles.row, { gap: 8, marginTop: 10 }]}>
-        <Button title="これで作る" small onPress={() => use(t)} />
+        <Button title="これで作る" icon="sparkles" small onPress={() => use(t)} />
         {!t.builtIn && (
           <>
             <Button title="編集" small kind="secondary" onPress={() => setEditing(t)} />
@@ -86,14 +90,15 @@ export default function TemplatesScreen() {
         </Card>
       ) : (
         <Button
-          title="＋ テンプレートを追加"
+          title="テンプレートを追加"
+          icon="add-circle-outline"
           kind="secondary"
           disabled={custom.length >= MAX_TEMPLATES}
           onPress={() => setEditing({ id: `c${Date.now()}`, name: '', instruction: '' })}
         />
       )}
 
-      {custom.length > 0 && <Label>自分のテンプレート</Label>}
+      {custom.length > 0 && <Label>あなたのテンプレート</Label>}
       {custom.map(row)}
       <Label>標準テンプレート</Label>
       {BUILT_IN_TEMPLATES.map(row)}

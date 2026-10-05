@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Text } from 'react-native';
+
 import { useApp } from './AppContext';
 import { ApiError, completeAd, startAd } from './api';
 import { rewardedAvailable, showRewarded } from './ads';
-import { Button, styles } from './ui';
+import { Button, styles, Text } from './ui';
 
 /** 「広告を見て無料で1回分」ボタン。広告が使えない・今日の分を受け取り済みのときは案内だけ出す */
 export default function RewardedButton() {
@@ -40,7 +40,7 @@ export default function RewardedButton() {
 
   return (
     <>
-      <Button title={`広告を見て無料で1回分（あと${remaining}本）`} kind="secondary" onPress={watch} loading={busy} />
+      <Button title={`広告を見て無料で1回分（あと${remaining}本）`} icon="play-circle-outline" kind="secondary" onPress={watch} loading={busy} />
       <Text style={[styles.small, { marginTop: 6 }]}>
         広告{ad.viewsPerCredit}本で、文章の作成1回分を無料で受け取れます（1日1回まで）。無料分は予約投稿には使えません。
       </Text>

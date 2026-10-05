@@ -25,6 +25,8 @@ export interface Template {
   id: string;
   name: string;
   instruction: string;
+  /** 一覧で表示する絵文字 */
+  emoji?: string;
   builtIn?: boolean;
 }
 

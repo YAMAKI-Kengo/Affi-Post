@@ -15,7 +15,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#16161A",
+        "backgroundColor": "#FF6B4A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -31,6 +31,9 @@
       "lang": "ja",
       "themeColor": "#16161A",
       "backgroundColor": "#F6F6F4"
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

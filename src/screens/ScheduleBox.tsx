@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useApp } from '../AppContext';
 import { ApiError, schedulePost } from '../api';
 import { THREADS_MAX_CHARS } from '../config';
 import { charCount, hasDisclosure } from '../compliance';
 import { Draft } from '../types';
-import { Button, Card, Chip, Field, Label, colors, styles } from '../ui';
+import { Button, Card, Chip, Field, Label, colors, styles, Text, Icon } from '../ui';
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -65,8 +65,11 @@ export default function ScheduleBox({ draft, onScheduled }: { draft: Draft; onSc
   };
 
   return (
-    <Card>
-      <Text style={{ fontWeight: '800', color: colors.text }}>自動投稿（@{account.username}）</Text>
+    <Card style={{ backgroundColor: '#FFFAF6', marginTop: 18 }}>
+      <View style={styles.row}>
+        <Icon name="time" size={18} color={colors.accent} />
+        <Text style={{ fontWeight: '700', marginLeft: 6 }}>予約して自動で投稿（@{account.username}）</Text>
+      </View>
       <Text style={[styles.small, { marginTop: 2 }]}>
         指定した日時に、この内容のまま投稿します{draft.linkPlacement === 'reply' && draft.link ? '（リンクは自分の投稿へのリプとして自動で付けます）' : ''}。
       </Text>
@@ -86,7 +89,7 @@ export default function ScheduleBox({ draft, onScheduled }: { draft: Draft; onSc
           </Text>
         </>
       ) : (
-        <Button title="日時を指定して自動投稿" kind="secondary" onPress={() => setOpen(true)} />
+        <Button title="日時を指定して予約する" icon="calendar-outline" kind="secondary" onPress={() => setOpen(true)} />
       )}
     </Card>
   );

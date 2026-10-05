@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { useApp } from '../AppContext';
 import { ApiError, connectThreads, disconnectThreads } from '../api';
 import { API_BASE } from '../config';
-import { Button, Card, Field, Label, colors, styles } from '../ui';
+import { Button, Field, Label, Pill, Section, colors, styles, Text } from '../ui';
 
 /** 設定画面の「自動投稿（上級者向け）」：利用者自身の Meta アプリのトークンで Threads と接続する */
 export default function AutopostSettings() {
@@ -47,8 +47,10 @@ export default function AutopostSettings() {
 
   return (
     <>
-      <Label hint="上級者向け">自動投稿（予約投稿）</Label>
-      <Card style={{ marginTop: 0 }}>
+      <Section icon="time" title="自動投稿（予約投稿）">
+        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+          <Pill icon="rocket-outline" label="上級者向け" tone="warn" />
+        </View>
         {account?.connected ? (
           <>
             <Text style={{ fontWeight: '800', color: colors.text }}>
@@ -100,12 +102,12 @@ export default function AutopostSettings() {
             </Text>
           </>
         )}
-      </Card>
       {account?.connected && (
         <Text style={[styles.small, { marginTop: 6 }]}>
           スパム判定を避けるため、自動投稿は1日5件まで・前後の予約と60分以上あける・同じ文章は14日間使えない、という制限があります。投稿時刻は指定から最大15分ずれます。
         </Text>
       )}
+      </Section>
     </>
   );
 }
