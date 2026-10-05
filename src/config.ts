@@ -24,3 +24,12 @@ export const LEGAL_PAGES = [
 
 /** Threads の1投稿あたりの最大文字数 */
 export const THREADS_MAX_CHARS = 500;
+
+/**
+ * 広告（Web 版のみ）。未設定なら広告は一切表示しない
+ * - ADSENSE_CLIENT / ADSENSE_BANNER_SLOT: Google AdSense のパブリッシャー ID（ca-pub-...）とバナーの広告ユニット ID
+ * - GAM_REWARDED_UNIT: Google Ad Manager のリワード広告ユニットのパス（例: /12345678/affipo_rewarded）
+ */
+export const ADSENSE_CLIENT = process.env.EXPO_PUBLIC_ADSENSE_CLIENT ?? '';
+export const ADSENSE_BANNER_SLOT = process.env.EXPO_PUBLIC_ADSENSE_BANNER_SLOT ?? '';
+export const GAM_REWARDED_UNIT = process.env.EXPO_PUBLIC_GAM_REWARDED_UNIT ?? '';

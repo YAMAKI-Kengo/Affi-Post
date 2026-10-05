@@ -30,7 +30,27 @@ async function call<T>(path: string, init?: { method?: string; body?: unknown; i
   return data as T;
 }
 
-export const fetchBalance = (installId?: string) => call<{ credits: number }>('/v1/me', { installId });
+export interface AdStatus {
+  enabled: boolean;
+  viewsPerCredit: number;
+  /** 次の1回分までに見た本数 */
+  viewsToward: number;
+  grantsLeftToday: number;
+}
+
+export interface Balance {
+  /** 購入した回数 */
+  credits: number;
+  /** 広告視聴で受け取った無料回数（文章の作成にだけ使える） */
+  freeCredits: number;
+  ad?: AdStatus;
+}
+
+export const fetchBalance = (installId?: string) => call<Balance>('/v1/me', { installId });
+
+export const startAd = () => call<{ nonce: string }>('/v1/ads/start', { method: 'POST' });
+export const completeAd = (nonce: string) =>
+  call<{ granted: boolean; ad: AdStatus }>('/v1/ads/complete', { method: 'POST', body: { nonce } });
 
 export const fetchProductInfo = (url: string) =>
   call<{ name: string; price: string; description: string; image: string; url: string }>('/v1/product', {
@@ -39,7 +59,7 @@ export const fetchProductInfo = (url: string) =>
   });
 
 export const generate = (p: ProductForm, template: string, tone: string, linkPlacement: LinkPlacement) =>
-  call<{ patterns: Pattern[]; credits: number }>('/v1/generate', {
+  call<{ patterns: Pattern[]; credits: number; freeCredits: number }>('/v1/generate', {
     method: 'POST',
     body: {
       product: { name: p.name, price: p.price, description: p.description, experience: p.experience },

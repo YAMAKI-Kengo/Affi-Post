@@ -180,8 +180,9 @@ export async function handleSchedule(req: Request, env: AutopostEnv, userId: str
     .first<{ n: number }>();
   if ((dup?.n ?? 0) > 0) return fail(400, 'duplicate', `同じ文章が${L.duplicateDays}日以内に予約・投稿されています。文章を変えてください。`);
 
+  // 予約投稿には購入した回数だけを使う（広告で受け取った無料回数は文章の作成専用）
   const r = await env.DB.prepare('UPDATE users SET credits = credits - 1 WHERE id = ? AND credits > 0').bind(userId).run();
-  if (!r.meta.changes) return fail(402, 'no_credits', '残り回数がありません。「回数を追加」から購入してください。');
+  if (!r.meta.changes) return fail(402, 'no_credits', '予約投稿には購入した回数が必要です（無料分は文章の作成だけに使えます）。「回数を追加」から購入してください。');
 
   const id = crypto.randomUUID();
   const runAt = scheduledAt + Math.floor(Math.random() * L.jitterMin * MIN);

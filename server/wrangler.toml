@@ -23,6 +23,17 @@ MONTHLY_BUDGET_USD = "20"
 # Stripe 決済 = 付与回数。キーは Payment Link ID（plink_...）か「通貨+支払額」（jpy300 など）
 STRIPE_LINKS = "jpy300:30,jpy800:100"
 
+# リワード広告（広告を見たら無料で1回分）。Google Ad Manager の審査が通ってから "1" にする
+AD_REWARD_ENABLED = "0"
+# 広告何本で1回分か / 1端末・1IPあたり1日に受け取れる無料回数
+AD_VIEWS_PER_CREDIT = "2"
+AD_DAILY_GRANTS_PER_USER = "1"
+AD_DAILY_GRANTS_PER_IP = "3"
+# 視聴開始からこの秒数たたない完了報告は無効
+AD_MIN_WATCH_SEC = "10"
+# 無料回数で生成したときの Claude 費用の月間上限（USD）。約1,000円。超えたら翌月まで無料分を止める
+FREE_MONTHLY_BUDGET_USD = "7"
+
 # シークレットは `npx wrangler secret put <NAME>` で設定する（このファイルには書かない）
 #   ANTHROPIC_API_KEY     … 販売者の Claude API キー
 #   STRIPE_WEBHOOK_SECRET … Stripe Webhook の署名シークレット（whsec_...）

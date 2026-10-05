@@ -9,11 +9,12 @@ import { ID_RE, getInstallId, setInstallId } from '../storage';
 import { DisclosureStyle } from '../types';
 import { Button, Card, Chip, Field, Label, colors, styles } from '../ui';
 import AutopostSettings from './AutopostSettings';
+import RewardedButton from '../RewardedButton';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function SettingsScreen() {
-  const { credits, refreshCredits, settings, updateSettings, toast } = useApp();
+  const { credits, paidCredits, freeCredits, refreshCredits, settings, updateSettings, toast } = useApp();
   const [installId, setId] = useState('');
   const [restore, setRestore] = useState('');
   const [showRestore, setShowRestore] = useState(false);
@@ -73,6 +74,11 @@ export default function SettingsScreen() {
       <Card style={{ marginTop: 0 }}>
         <Text style={styles.small}>残り回数</Text>
         <Text style={{ fontSize: 32, fontWeight: '800', color: colors.text }}>{credits ?? '—'} 回</Text>
+        {freeCredits > 0 && (
+          <Text style={[styles.small, { marginTop: 2 }]}>
+            購入分 {paidCredits ?? 0} 回 ／ 無料分 {freeCredits} 回（無料分は文章の作成だけに使えます）
+          </Text>
+        )}
         <Text style={[styles.small, { marginTop: 4 }]}>
           1回の作成で投稿文を3パターン作れます。作成に失敗したときは消費されません。購入した回数に有効期限はありません。
         </Text>
@@ -91,6 +97,7 @@ export default function SettingsScreen() {
       ) : (
         <Text style={styles.small}>現在、購入の受付を停止しています。</Text>
       )}
+      <RewardedButton />
       {__DEV__ && <Button title="（開発用）10回付与" kind="secondary" onPress={devGrant} />}
 
       <Label>広告表記</Label>

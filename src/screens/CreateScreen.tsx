@@ -11,6 +11,8 @@ import { openThreads } from '../threads';
 import { Draft, Pattern, ProductForm, Template, emptyProduct } from '../types';
 import { Button, Card, Chip, Field, Label, StepTitle, colors, styles } from '../ui';
 import ScheduleBox from './ScheduleBox';
+import RewardedButton from '../RewardedButton';
+import { BannerAd } from '../ads';
 
 const TONES = ['カジュアル', '丁寧', '熱量高め', '落ち着いた'];
 const K_RESULT = 'last_result_v1';
@@ -23,7 +25,7 @@ interface Editor extends Draft {
 }
 
 export default function CreateScreen() {
-  const { tab, settings, updateSettings, credits, setCredits, setTab, toast, reopen, openInEditor } = useApp();
+  const { refreshCredits, tab, settings, updateSettings, credits, setBalance, setTab, toast, reopen, openInEditor } = useApp();
   const [product, setProduct] = useState<ProductForm>(emptyProduct);
   const [image, setImage] = useState('');
   const [templates, setTemplates] = useState<Template[]>(BUILT_IN_TEMPLATES);
@@ -126,14 +128,14 @@ export default function CreateScreen() {
     setGenerating(true);
     try {
       const r = await generate(product, `${template.name}: ${template.instruction}`, settings.tone, settings.linkPlacement);
-      setCredits(r.credits);
+      setBalance({ credits: r.credits, freeCredits: r.freeCredits });
       setPatterns(r.patterns);
       setSelected(null);
       setEditor(null);
       setTimeout(() => scroll.current?.scrollTo({ y: resultsY.current - 12, animated: true }), 100);
     } catch (e) {
       toast(e instanceof ApiError ? e.message : '作成できませんでした。もう一度お試しください。');
-      if (e instanceof ApiError && e.code === 'no_credits') setCredits(0);
+      if (e instanceof ApiError && e.code === 'no_credits') refreshCredits();
     } finally {
       setGenerating(false);
     }
@@ -193,7 +195,8 @@ export default function CreateScreen() {
           <Text style={[styles.small, { marginTop: 4 }]}>
             1回の作成で、投稿文を3パターン作れます。購入した回数に期限はありません。
           </Text>
-          <Button title="回数を追加する" kind="highlight" onPress={() => setTab('settings')} />
+          <Button title="回数を購入する" kind="highlight" onPress={() => setTab('settings')} />
+          <RewardedButton />
         </Card>
       )}
 
@@ -292,6 +295,9 @@ export default function CreateScreen() {
               </Card>
             </Pressable>
           ))}
+          <View style={{ marginTop: 12 }}>
+            <BannerAd />
+          </View>
         </View>
       )}
 

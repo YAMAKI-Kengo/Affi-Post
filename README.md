@@ -18,6 +18,12 @@
   - 1日5件まで・前後60分以上あける・同じ文章は14日間不可・投稿時刻を0〜15分ランダムに遅らせる
   - 予約1件 = 1回分。取り消し・投稿失敗のときは戻す。「API access blocked」などの恒久エラーは再試行しない
   - トークンは AES-GCM で暗号化して D1 に保存し、Cron（5分ごと）で予約の実行と7日ごとのトークン延長を行う
+- 広告（Web 版のみ、`src/ads.tsx` / `server/src/ads.ts`）
+  - バナー: Google AdSense。作成画面以外の下と、生成結果の下に表示
+  - リワード: Google Ad Manager。広告2本で無料1回分（文章作成のみ・予約投稿には使えない）、1端末1日1回・1IP1日3回まで
+  - 無料回数で生成した原価が `FREE_MONTHLY_BUDGET_USD`（既定 $7 ≈ 1,000円）に達したら、その月は無料分を止める
+  - 広告の ID（`EXPO_PUBLIC_ADSENSE_*` / `EXPO_PUBLIC_GAM_REWARDED_UNIT`）が未設定、またはサーバーの `AD_REWARD_ENABLED=0` なら何も表示しない
+  - 本番 D1 には `migrations/0002_ads.sql` を一度だけ適用する（`npx wrangler d1 execute affi-post --remote --file=migrations/0002_ads.sql`）
 - 履歴・テンプレート・下書きは端末内（localStorage）にのみ保存
 
 ## ローカル開発

@@ -2,7 +2,8 @@
  * アフィポ API（Cloudflare Workers）
  *
  * - 販売者の Claude API キーはこのサーバーのシークレットにのみ保存し、アプリには一切渡さない
- * - 利用者は端末ごとのランダムIDで識別し、1回の生成（3パターン）で1回分を消費する。無料枠はない
+ * - 利用者は端末ごとのランダムIDで識別し、1回の生成（3パターン）で1回分を消費する
+ * - 無料で使えるのは、リワード広告の視聴で付与した無料回数だけ（ads.ts。無料分の月間予算で上限）
  * - 生成に失敗した場合は回数を戻す。月間の API 費用が上限（MONTHLY_BUDGET_USD）に達したら生成を止める
  * - 上級者向けの予約投稿（autopost.ts）は、利用者自身の Threads アクセストークンで公式 API から投稿する
  */
@@ -18,8 +19,9 @@ import {
   handleSchedule,
   runAutopost,
 } from './autopost';
+import { AdsEnv, adStatus, cleanupAds, freeBudgetLeft, freeCostKey, handleAdComplete, handleAdStart } from './ads';
 
-export interface Env extends AutopostEnv {
+export interface Env extends AutopostEnv, AdsEnv {
   DB: D1Database;
   ANTHROPIC_API_KEY: string;
   MODEL: string;
@@ -67,7 +69,9 @@ function addCounter(env: Env, key: string, n: number) {
 
 async function getUser(env: Env, id: string) {
   await env.DB.prepare('INSERT OR IGNORE INTO users (id, created_at) VALUES (?, ?)').bind(id, Date.now()).run();
-  return (await env.DB.prepare('SELECT credits, last_at FROM users WHERE id = ?').bind(id).first<{ credits: number; last_at: number }>())!;
+  return (await env.DB.prepare('SELECT credits, free_credits, last_at FROM users WHERE id = ?')
+    .bind(id)
+    .first<{ credits: number; free_credits: number; last_at: number }>())!;
 }
 
 function installId(req: Request) {
@@ -81,7 +85,7 @@ async function handleMe(req: Request, env: Env) {
   const id = installId(req);
   if (!id) return fail(400, 'bad_install_id', '端末IDが不正です。');
   const u = await getUser(env, id);
-  return json({ credits: u.credits });
+  return json({ credits: u.credits, freeCredits: u.free_credits, ad: await adStatus(env, id) });
 }
 
 async function handleProduct(req: Request, env: Env) {
@@ -93,7 +97,7 @@ async function handleProduct(req: Request, env: Env) {
 
   // 商品ページの取得は回数を消費しないが、購入者のみ・1日の上限ありとする（踏み台としての悪用防止）
   const user = await getUser(env, id);
-  if (user.credits <= 0) return fail(402, 'no_credits', '商品情報の自動取得は、回数をお持ちの方のみ使えます。');
+  if (user.credits + user.free_credits <= 0) return fail(402, 'no_credits', '商品情報の自動取得は、残り回数がある方のみ使えます。');
   if ((await counter(env, productDayKey(id))) >= PRODUCT_DAILY_CAP) {
     return fail(429, 'product_cap', '本日の自動取得の上限に達しました。商品情報を手入力してください。');
   }
@@ -141,23 +145,46 @@ async function handleGenerate(req: Request, env: Env) {
     return fail(503, 'budget_exceeded', '今月のサービス提供上限に達しました。ご迷惑をおかけしますが、来月までお待ちください（回数は減りません）。');
   }
 
-  // 先に1回分を確保し、失敗したら戻す（同時リクエストでも残り回数を超えて使えない）
-  const r = await env.DB.prepare('UPDATE users SET credits = credits - 1, last_at = ? WHERE id = ? AND credits > 0').bind(now, id).run();
-  if (!r.meta.changes) return fail(402, 'no_credits', '残り回数がありません。「回数を追加」から購入してください。');
-  const refund = () => env.DB.prepare('UPDATE users SET credits = credits + 1 WHERE id = ?').bind(id).run();
+  // 先に1回分を確保し、失敗したら戻す（同時リクエストでも残り回数を超えて使えない）。
+  // 無料回数があり、無料分の月間予算が残っていれば無料回数から使う
+  let col: 'free_credits' | 'credits' = 'credits';
+  if (user.free_credits > 0 && (await freeBudgetLeft(env, worstCaseCost(maxTokens)))) {
+    const f = await env.DB.prepare('UPDATE users SET free_credits = free_credits - 1, last_at = ? WHERE id = ? AND free_credits > 0')
+      .bind(now, id)
+      .run();
+    if (f.meta.changes) col = 'free_credits';
+  }
+  if (col === 'credits') {
+    const r = await env.DB.prepare('UPDATE users SET credits = credits - 1, last_at = ? WHERE id = ? AND credits > 0').bind(now, id).run();
+    if (!r.meta.changes) {
+      const msg = user.free_credits > 0
+        ? '今月の無料分の提供上限に達しました。購入した回数でご利用ください。'
+        : '残り回数がありません。「回数を追加」から購入するか、広告を見て無料分を受け取ってください。';
+      return fail(402, 'no_credits', msg);
+    }
+  }
+  const refund = () => env.DB.prepare(`UPDATE users SET ${col} = ${col} + 1 WHERE id = ?`).bind(id).run();
+  const balance = async () => {
+    const u = await getUser(env, id);
+    return { credits: u.credits, freeCredits: u.free_credits };
+  };
+  const addCost = (cost: number) =>
+    col === 'free_credits'
+      ? env.DB.batch([addCounter(env, monthKey(), cost), addCounter(env, freeCostKey(), cost)])
+      : addCounter(env, monthKey(), cost).run();
 
   if (env.MOCK_AI === '1') {
-    return json({ patterns: MOCK_PATTERNS(input.product.name, input.linkPlacement === 'reply'), credits: user.credits - 1 });
+    return json({ patterns: MOCK_PATTERNS(input.product.name, input.linkPlacement === 'reply'), ...(await balance()) });
   }
 
   try {
     const { patterns, costMicroUsd } = await generatePosts(env.ANTHROPIC_API_KEY, env.MODEL, maxTokens, input);
-    await addCounter(env, monthKey(), costMicroUsd).run();
-    return json({ patterns, credits: user.credits - 1 });
+    await addCost(costMicroUsd);
+    return json({ patterns, ...(await balance()) });
   } catch (e) {
     await refund();
     const cost = (e as { costMicroUsd?: number }).costMicroUsd;
-    if (cost) await addCounter(env, monthKey(), cost).run();
+    if (cost) await addCost(cost);
     if (e instanceof GenerateError) return fail(e.status, e.code, e.message);
     throw e;
   }
@@ -254,6 +281,8 @@ export default {
       if (req.method === 'GET' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleList(env, id));
       if (req.method === 'POST' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleSchedule(req, env, id));
       if (req.method === 'POST' && pathname === '/v1/schedule/cancel') return await withUser(req, env, (id) => handleCancel(req, env, id));
+      if (req.method === 'POST' && pathname === '/v1/ads/start') return await withUser(req, env, (id) => handleAdStart(req, env, id));
+      if (req.method === 'POST' && pathname === '/v1/ads/complete') return await withUser(req, env, (id) => handleAdComplete(req, env, id));
       if (req.method === 'POST' && pathname === '/v1/dev/grant') return await handleDevGrant(req, env);
       if (req.method === 'POST' && pathname === '/v1/dev/cron' && env.DEV_MODE === '1') {
         await runAutopost(env);
@@ -269,5 +298,6 @@ export default {
   // 予約投稿の実行とトークン更新（5分ごと）
   async scheduled(_: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(runAutopost(env));
+    if (new Date().getUTCHours() === 18 && new Date().getUTCMinutes() < 5) ctx.waitUntil(cleanupAds(env)); // 日本時間3時ごろ
   },
 };

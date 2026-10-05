@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
-import { ThreadsAccount, fetchBalance, fetchThreadsAccount } from './api';
+import { AdStatus, Balance, ThreadsAccount, fetchBalance, fetchThreadsAccount } from './api';
 import { loadSettings, saveSettings } from './storage';
 import { AppSettings, HistoryItem, defaultSettings } from './types';
 
@@ -11,8 +11,14 @@ interface Ctx {
   setTab: (t: Tab) => void;
   settings: AppSettings;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  /** 残り回数の合計（購入分＋無料分）。未取得なら null */
   credits: number | null;
-  setCredits: (n: number) => void;
+  /** 購入した回数（予約投稿に使えるのはこちらだけ） */
+  paidCredits: number | null;
+  freeCredits: number;
+  ad: AdStatus | null;
+  setBalance: (b: Partial<Balance>) => void;
+  /** 残り回数を取り直し、合計を返す */
   refreshCredits: () => Promise<number | null>;
   /** 履歴から「作成」画面の編集欄に読み込む投稿 */
   reopen: HistoryItem | null;
@@ -29,7 +35,15 @@ export const useApp = () => useContext(AppCtx);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [tab, setTab] = useState<Tab>('create');
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-  const [credits, setCredits] = useState<number | null>(null);
+  const [paidCredits, setPaid] = useState<number | null>(null);
+  const [freeCredits, setFree] = useState(0);
+  const [ad, setAd] = useState<AdStatus | null>(null);
+  const credits = paidCredits === null ? null : paidCredits + freeCredits;
+  const setBalance = useCallback((b: Partial<Balance>) => {
+    if (b.credits !== undefined) setPaid(b.credits);
+    if (b.freeCredits !== undefined) setFree(b.freeCredits);
+    if (b.ad !== undefined) setAd(b.ad);
+  }, []);
   const [reopen, setReopen] = useState<HistoryItem | null>(null);
   const [toastMsg, setToastMsg] = useState('');
   const [account, setAccount] = useState<ThreadsAccount | null>(null);
@@ -51,12 +65,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshCredits = useCallback(async () => {
     try {
       const b = await fetchBalance();
-      setCredits(b.credits);
-      return b.credits;
+      setBalance(b);
+      return b.credits + b.freeCredits;
     } catch {
       return null;
     }
-  }, []);
+  }, [setBalance]);
 
   useEffect(() => {
     refreshCredits();
@@ -84,7 +98,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppCtx.Provider
-      value={{ tab, setTab, settings, updateSettings, credits, setCredits, refreshCredits, reopen, openInEditor, toast, account, setAccount }}
+      value={{ tab, setTab, settings, updateSettings, credits, paidCredits, freeCredits, ad, setBalance, refreshCredits, reopen, openInEditor, toast, account, setAccount }}
     >
       {children}
       <Animated.View pointerEvents="none" style={[st.toast, { opacity }]}>

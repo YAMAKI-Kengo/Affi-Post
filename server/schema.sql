@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   credits INTEGER NOT NULL DEFAULT 0,
+  free_credits INTEGER NOT NULL DEFAULT 0, -- 広告視聴で付与した無料回数
   last_at INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
@@ -54,3 +55,13 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
 );
 CREATE INDEX IF NOT EXISTS idx_sched_due ON scheduled_posts (status, run_at);
 CREATE INDEX IF NOT EXISTS idx_sched_user ON scheduled_posts (user_id, scheduled_at);
+
+-- リワード広告の視聴セッション（migrations/0002_ads.sql と同じ）
+CREATE TABLE IF NOT EXISTS ad_sessions (
+  nonce TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ad_sessions_started ON ad_sessions (started_at);

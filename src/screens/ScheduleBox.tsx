@@ -26,7 +26,7 @@ function defaultTime() {
 
 /** 編集中の投稿を、指定日時に自動投稿として予約する（上級者向け） */
 export default function ScheduleBox({ draft, onScheduled }: { draft: Draft; onScheduled: () => void }) {
-  const { account, setCredits, setTab, toast } = useApp();
+  const { account, setBalance, setTab, toast } = useApp();
   const [open, setOpen] = useState(false);
   const [dayIndex, setDayIndex] = useState(0);
   const [time, setTime] = useState(defaultTime);
@@ -52,7 +52,7 @@ export default function ScheduleBox({ draft, onScheduled }: { draft: Draft; onSc
         topic: draft.topic,
         scheduledAt: at.getTime(),
       });
-      setCredits(r.credits);
+      setBalance({ credits: r.credits });
       setOpen(false);
       onScheduled();
       toast(`${options[dayIndex].label} ${time} に予約しました。「履歴」の予約から確認・取り消しできます。`);
