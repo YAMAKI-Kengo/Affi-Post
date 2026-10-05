@@ -6,6 +6,7 @@ import { loadHistory, removeHistory, upsertHistory } from '../storage';
 import { HistoryItem } from '../types';
 import { Button, Card, Chip, EmptyState, Icon, Pill, Text, colors, formatDate, styles } from '../ui';
 import ScheduledList from './ScheduledList';
+import { AdSlot } from '../ads';
 
 export default function HistoryScreen() {
   const { tab, openInEditor, toast, account } = useApp();
@@ -47,7 +48,8 @@ export default function HistoryScreen() {
         )
         )
       }
-      renderItem={({ item }) => (
+      renderItem={({ item, index }) => (
+        <>
         <Card>
           <View style={[styles.row, { justifyContent: 'space-between' }]}>
             <Text style={{ fontWeight: '700', color: colors.text, flex: 1 }} numberOfLines={1}>
@@ -91,6 +93,8 @@ export default function HistoryScreen() {
             )}
           </View>
         </Card>
+        {index % 5 === 4 && <AdSlot tab="history" />}
+        </>
       )}
     />
   );

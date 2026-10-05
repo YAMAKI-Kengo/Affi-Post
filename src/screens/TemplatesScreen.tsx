@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { useApp } from '../AppContext';
 import { BUILT_IN_TEMPLATES, loadCustomTemplates, saveCustomTemplates } from '../storage';
 import { Template } from '../types';
+import { AdSlot } from '../ads';
 import { Button, Card, Field, Label, colors, styles, Text, Pill } from '../ui';
 
 const MAX_TEMPLATES = 20;
@@ -102,6 +103,7 @@ export default function TemplatesScreen() {
       {custom.map(row)}
       <Label>標準テンプレート</Label>
       {BUILT_IN_TEMPLATES.map(row)}
+      <AdSlot tab="templates" />
     </ScrollView>
   );
 }

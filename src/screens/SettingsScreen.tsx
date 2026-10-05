@@ -10,6 +10,7 @@ import { DisclosureStyle } from '../types';
 import { Button, Chip, Field, colors, styles, Text, Icon, Section } from '../ui';
 import AutopostSettings from './AutopostSettings';
 import RewardedButton from '../RewardedButton';
+import { AdSlot } from '../ads';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -187,6 +188,7 @@ export default function SettingsScreen() {
           作成した文章・商品情報・履歴はこの端末の中にだけ保存されます。
         </Text>
       </Section>
+      <AdSlot tab="settings" />
     </ScrollView>
   );
 }

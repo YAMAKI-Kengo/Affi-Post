@@ -8,7 +8,6 @@ import CreateScreen from './src/screens/CreateScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import TemplatesScreen from './src/screens/TemplatesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import { BannerAd } from './src/ads';
 
 const TABS: { key: Tab; label: string; icon: IconName; iconOn: IconName; title: string }[] = [
   { key: 'create', label: 'つくる', icon: 'create-outline', iconOn: 'create', title: 'アフィポ' },
@@ -47,8 +46,6 @@ function Shell() {
           <SettingsScreen />
         </View>
       </View>
-      {/* バナー広告は入力の邪魔にならないよう、作成画面以外の下にだけ出す（広告の設定がなければ何も出ない） */}
-      {tab !== 'create' && <BannerAd key={tab} />}
       <View style={st.tabBar}>
         {TABS.map((t) => {
           const on = tab === t.key;

@@ -12,7 +12,7 @@ import { Draft, Pattern, ProductForm, Template, emptyProduct } from '../types';
 import { Button, Card, Chip, Field, Icon, IconName, Label, Pill, Section, Text, colors, styles } from '../ui';
 import ScheduleBox from './ScheduleBox';
 import RewardedButton from '../RewardedButton';
-import { BannerAd } from '../ads';
+import { AdSlot } from '../ads';
 
 const TONES = [
   { label: 'カジュアル', emoji: '😊' },
@@ -387,6 +387,7 @@ export default function CreateScreen() {
           <Text style={[styles.small, { marginTop: 4 }]}>10秒ほどお待ちください</Text>
         </Card>
       )}
+      {generating && <AdSlot tab="create" />}
 
       {patterns.length > 0 && !generating && (
         <View onLayout={(e) => (resultsY.current = e.nativeEvent.layout.y)} style={{ marginTop: 20 }}>
@@ -422,9 +423,7 @@ export default function CreateScreen() {
               </Pressable>
             );
           })}
-          <View style={{ marginTop: 12 }}>
-            <BannerAd />
-          </View>
+          <AdSlot tab="create" />
         </View>
       )}
 

@@ -4,9 +4,11 @@
  * - showRewarded: Google Ad Manager（GPT）のリワード広告。利用者がボタンを押して同意したときだけ表示する
  * ID が未設定のビルドや Web 以外では何もしない。
  */
-import React, { useEffect, useRef } from 'react';
-import { Platform, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform, View, ViewStyle } from 'react-native';
 import { ADSENSE_BANNER_SLOT, ADSENSE_CLIENT, GAM_REWARDED_UNIT } from './config';
+import { Tab, useApp } from './AppContext';
+import { Text, colors } from './ui';
 
 const isWeb = Platform.OS === 'web' && typeof document !== 'undefined';
 const scripts = new Map<string, Promise<void>>();
@@ -35,8 +37,12 @@ function loadScript(src: string, attrs: Record<string, string> = {}) {
 export const bannerAvailable = () => isWeb && !!ADSENSE_CLIENT && !!ADSENSE_BANNER_SLOT;
 export const rewardedAvailable = () => isWeb && !!GAM_REWARDED_UNIT;
 
-/** AdSense のバナー（レスポンシブ）。設定がなければ何も表示しない */
-export function BannerAd() {
+/**
+ * AdSense の広告（レスポンシブ）。設定がなければ何も表示しない。
+ * AdSense の管理画面で「自動広告 → アンカー広告」を有効にすると、画面下に固定される広告も
+ * このスクリプト経由で表示される（タブバー付近に独自の固定バナーを置くと誤クリックを招くため、自前では置かない）。
+ */
+export function BannerAd({ onUnfilled }: { onUnfilled?: () => void } = {}) {
   const host = useRef<View>(null);
   useEffect(() => {
     if (!bannerAvailable()) return;
@@ -47,15 +53,23 @@ export function BannerAd() {
     ins.style.display = 'block';
     ins.setAttribute('data-ad-client', ADSENSE_CLIENT);
     ins.setAttribute('data-ad-slot', ADSENSE_BANNER_SLOT);
-    ins.setAttribute('data-ad-format', 'horizontal');
+    ins.setAttribute('data-ad-format', 'auto');
     ins.setAttribute('data-full-width-responsive', 'true');
+    // 開発中は AdSense のテストモード（収益・クリックの計測対象外）
+    if (__DEV__) ins.setAttribute('data-adtest', 'on');
     el.appendChild(ins);
+    // 配信する広告がなかったとき（data-ad-status="unfilled"）は、呼び出し元に知らせて枠ごと隠す
+    const obs = new MutationObserver(() => {
+      if (ins.getAttribute('data-ad-status') === 'unfilled') onUnfilled?.();
+    });
+    obs.observe(ins, { attributes: true, attributeFilter: ['data-ad-status'] });
     loadScript(`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`, { crossorigin: 'anonymous' })
       .then(() => ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({}))
-      .catch(() => {});
-  }, []);
+      .catch(() => onUnfilled?.());
+    return () => obs.disconnect();
+  }, [onUnfilled]);
   if (!bannerAvailable()) return null;
-  return <View ref={host} style={{ width: '100%', minHeight: 50, alignItems: 'center' }} />;
+  return <View ref={host} style={{ width: '100%', alignItems: 'center' }} />;
 }
 
 /**
@@ -110,4 +124,28 @@ export function showRewarded(): Promise<'granted' | 'closed' | 'unavailable'> {
       g.display(slot);
     });
   });
+}
+
+/**
+ * 「広告」の表示付きの広告枠。コンテンツの区切りに置く。
+ * 画面はすべてマウントしたまま表示を切り替えているので、非表示の画面（幅0）で広告を読み込まないよう、
+ * 指定した画面が初めて表示されたときに読み込む。
+ */
+export function AdSlot({ tab, style }: { tab: Tab; style?: ViewStyle }) {
+  const app = useApp();
+  const [armed, setArmed] = useState(false);
+  const [unfilled, setUnfilled] = useState(false);
+  const hide = useCallback(() => setUnfilled(true), []);
+  useEffect(() => {
+    if (app.tab === tab) setArmed(true);
+  }, [app.tab, tab]);
+  if (!bannerAvailable() || !armed || unfilled) return null;
+  return (
+    <View style={[{ marginTop: 16, marginBottom: 4 }, style]}>
+      <Text style={{ fontSize: 11, color: colors.faint, marginBottom: 4, marginLeft: 4 }}>広告</Text>
+      <View style={{ backgroundColor: '#FFFDFB', borderRadius: 16, overflow: 'hidden' }}>
+        <BannerAd onUnfilled={hide} />
+      </View>
+    </View>
+  );
 }
