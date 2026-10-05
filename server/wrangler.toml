@@ -3,6 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+# 公開 URL は独自ドメインのサブドメインだけにする（workers.dev の URL はアカウント名が入るため無効化）
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "affipo.kurashiapp.com", custom_domain = true, zone_name = "kurashiapp.com" }]
+
 # アプリ本体（Expo の Web 書き出し = PWA）を同じドメインで配信する。/v1/* だけ Worker が処理する
 [assets]
 directory = "../dist"
@@ -12,7 +17,7 @@ run_worker_first = ["/v1/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "affi-post"
-database_id = "df7632f7-399d-47af-999f-9a9d982d6a77"
+database_id = "26cfc97d-1577-47ab-ae9b-9d9b0c5ca436"
 
 [vars]
 # Claude のモデルと1回の生成で出力できる最大トークン数（= 1回あたりの最大原価を決める）
