@@ -14,7 +14,7 @@ export interface ProductInfo {
 
 const MAX_BYTES = 1_500_000;
 // 楽天市場の商品ページは応答まで10秒前後かかることがある
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 20000;
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', yen: '¥' };
 
@@ -84,6 +84,24 @@ async function readText(res: Response) {
   }
 }
 
+/**
+ * 取得してよい URL か。公開された通販サイトだけを想定し、IP アドレス直指定・内部向けの名前・
+ * 標準以外のポート・自分自身のドメインへの接続は断る（サーバーを踏み台にした内部アクセスやループの防止）
+ */
+export function isSafeTarget(url: URL) {
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+  if (url.username || url.password) return false;
+  if (url.port && url.port !== '80' && url.port !== '443') return false;
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (!host.includes('.')) return false; // localhost など
+  if (/^[\d.]+$/.test(host) || host.includes(':') || host.startsWith('[')) return false; // IPv4 / IPv6 の直指定
+  if (/(^|\.)(localhost|local|internal|intranet|home|lan|corp)$/.test(host)) return false;
+  if (host === 'kurashiapp.com' || host.endsWith('.kurashiapp.com')) return false;
+  return true;
+}
+
+const MAX_REDIRECTS = 5;
+
 export async function fetchProduct(rawUrl: string): Promise<ProductInfo | null> {
   let url: URL;
   try {
@@ -91,22 +109,36 @@ export async function fetchProduct(rawUrl: string): Promise<ProductInfo | null> 
   } catch {
     return null;
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (!isSafeTarget(url)) return null;
+  // http の URL は最初から https で取りに行く（楽天などは転送1回ごとに10秒近くかかるため）
+  if (url.protocol === 'http:') url.protocol = 'https:';
 
-  let res: Response;
+  // 転送（アフィリエイトリンク → 商品ページなど）は自分でたどり、転送先も毎回確認する
+  const deadline = AbortSignal.timeout(TIMEOUT_MS);
+  let res: Response | null = null;
   try {
-    res = await fetch(url.toString(), {
-      redirect: 'follow',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: {
-        'user-agent': 'Mozilla/5.0 (compatible; AffiPostLinkPreview/1.0)',
-        accept: 'text/html,application/xhtml+xml',
-        'accept-language': 'ja,en;q=0.5',
-      },
-    });
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      res = await fetch(url.toString(), {
+        redirect: 'manual',
+        signal: deadline,
+        headers: {
+          'user-agent': 'Mozilla/5.0 (compatible; AffiPostLinkPreview/1.0)',
+          accept: 'text/html,application/xhtml+xml',
+          'accept-language': 'ja,en;q=0.5',
+        },
+      });
+      const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (!loc) break;
+      res.body?.cancel().catch(() => {});
+      const next = new URL(loc, url);
+      if (!isSafeTarget(next)) return null;
+      url = next;
+      res = null;
+    }
   } catch {
     return null;
   }
+  if (!res) return null;
   if (!res.ok || !res.body || !(res.headers.get('content-type') ?? '').includes('html')) return null;
   const html = await readText(res);
 
@@ -129,6 +161,6 @@ export async function fetchProduct(rawUrl: string): Promise<ProductInfo | null> 
     price,
     description,
     image: typeof image === 'string' && image.startsWith('http') ? image : '',
-    url: res.url || url.toString(),
+    url: url.toString(),
   };
 }

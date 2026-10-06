@@ -29,6 +29,9 @@ MONTHLY_BUDGET_USD = "20"
 # お試し 10回 160円 / 定番 50回 480円 / たっぷり 120回 980円
 STRIPE_LINKS = "plink_1UNevcRz7oqxshxk8Ngmo6th:10,plink_1UNeySRz7oqxshxkYqsT02hU:50,plink_1UNezBRz7oqxshxk3yRBTFU9:120"
 
+# API をブラウザから呼んでよいサイト（カンマ区切り）。ローカル開発では .dev.vars で http://localhost:8081 を足す
+ALLOWED_ORIGINS = "https://affipo.kurashiapp.com"
+
 # リワード広告（広告を見たら無料で1回分）。Google Ad Manager の審査が通ってから "1" にする
 AD_REWARD_ENABLED = "0"
 # 広告何本で1回分か / 1端末・1IPあたり1日に受け取れる無料回数

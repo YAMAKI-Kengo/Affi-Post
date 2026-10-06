@@ -31,6 +31,8 @@ export interface Env extends AutopostEnv, AdsEnv {
   STRIPE_LINKS?: string;
   /** Stripe Webhook の署名シークレット（whsec_...） */
   STRIPE_WEBHOOK_SECRET?: string;
+  /** API を呼び出してよいブラウザのオリジン（カンマ区切り）。アプリ版（ネイティブ）は Origin を送らないので対象外 */
+  ALLOWED_ORIGINS?: string;
   /** ローカル開発専用（.dev.vars に書く）。"1" で回数付与 API と、Claude を呼ばない固定応答を有効にする */
   DEV_MODE?: string;
   MOCK_AI?: string;
@@ -42,14 +44,30 @@ const LIMITS = { name: 200, price: 50, description: 2000, experience: 1000, targ
 
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const CORS = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'content-type, x-install-id',
-};
-
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', ...CORS } });
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
+
+/**
+ * API の応答に CORS と安全用のヘッダーを付ける。
+ * ブラウザから呼べるのは ALLOWED_ORIGINS のサイトだけ（他のサイトが利用者の端末IDで API を使うのを防ぐ）。
+ */
+function secure(req: Request, env: Env, res: Response) {
+  const headers = new Headers(res.headers);
+  headers.delete('access-control-allow-origin');
+  const origin = req.headers.get('origin');
+  const allowed = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (origin && allowed.includes(origin)) {
+    headers.set('access-control-allow-origin', origin);
+    headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
+    headers.set('access-control-allow-headers', 'content-type, x-install-id');
+    headers.set('access-control-max-age', '600');
+  }
+  headers.set('vary', 'Origin');
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('cache-control', 'no-store');
+  headers.set('referrer-policy', 'no-referrer');
+  return new Response(res.body, { status: res.status, headers });
+}
 
 const fail = (status: number, code: string, message: string) => json({ error: code, message }, status);
 
@@ -241,6 +259,14 @@ async function grantCredits(env: Env, eventId: string, userId: string, productId
   }
 }
 
+/** 文字列の比較にかかる時間から署名を推測されないよう、長さが同じなら常に全文字を比べる */
+function safeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function hmacHex(secret: string, data: string) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
@@ -261,7 +287,8 @@ async function handleStripe(req: Request, env: Env) {
     .split(',')
     .filter((kv) => kv.startsWith('v1='))
     .map((kv) => kv.slice(3));
-  if (!t || Math.abs(Date.now() / 1000 - t) > 300 || !v1.includes(await hmacHex(env.STRIPE_WEBHOOK_SECRET, `${t}.${raw}`))) {
+  const expected = t ? await hmacHex(env.STRIPE_WEBHOOK_SECRET, `${t}.${raw}`) : '';
+  if (!t || Math.abs(Date.now() / 1000 - t) > 300 || !v1.some((sig) => safeEqual(sig, expected))) {
     return fail(400, 'bad_signature', 'bad signature');
   }
 
@@ -306,31 +333,7 @@ async function handleDevGrant(req: Request, env: Env) {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    const { pathname } = new URL(req.url);
-    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-    try {
-      if (req.method === 'GET' && pathname === '/v1/me') return await handleMe(req, env);
-      if (req.method === 'POST' && pathname === '/v1/product') return await handleProduct(req, env);
-      if (req.method === 'POST' && pathname === '/v1/generate') return await handleGenerate(req, env);
-      if (req.method === 'POST' && pathname === '/v1/stripe') return await handleStripe(req, env);
-      if (req.method === 'GET' && pathname === '/v1/threads/account') return await withUser(req, env, (id) => handleAccount(env, id));
-      if (req.method === 'POST' && pathname === '/v1/threads/connect') return await withUser(req, env, (id) => handleConnect(req, env, id));
-      if (req.method === 'POST' && pathname === '/v1/threads/disconnect') return await withUser(req, env, (id) => handleDisconnect(env, id));
-      if (req.method === 'GET' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleList(env, id));
-      if (req.method === 'POST' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleSchedule(req, env, id));
-      if (req.method === 'POST' && pathname === '/v1/schedule/cancel') return await withUser(req, env, (id) => handleCancel(req, env, id));
-      if (req.method === 'POST' && pathname === '/v1/ads/start') return await withUser(req, env, (id) => handleAdStart(req, env, id));
-      if (req.method === 'POST' && pathname === '/v1/ads/complete') return await withUser(req, env, (id) => handleAdComplete(req, env, id));
-      if (req.method === 'POST' && pathname === '/v1/dev/grant') return await handleDevGrant(req, env);
-      if (req.method === 'POST' && pathname === '/v1/dev/cron' && env.DEV_MODE === '1') {
-        await runAutopost(env);
-        return json({ ok: true });
-      }
-      return fail(404, 'not_found', 'not found');
-    } catch (e) {
-      console.error(e);
-      return fail(500, 'internal', 'サーバーエラーが発生しました。');
-    }
+    return secure(req, env, await route(req, env));
   },
 
   // 予約投稿の実行とトークン更新（5分ごと）
@@ -339,3 +342,31 @@ export default {
     if (new Date().getUTCHours() === 18 && new Date().getUTCMinutes() < 5) ctx.waitUntil(cleanupAds(env)); // 日本時間3時ごろ
   },
 };
+
+async function route(req: Request, env: Env): Promise<Response> {
+  const { pathname } = new URL(req.url);
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204 });
+  try {
+    if (req.method === 'GET' && pathname === '/v1/me') return await handleMe(req, env);
+    if (req.method === 'POST' && pathname === '/v1/product') return await handleProduct(req, env);
+    if (req.method === 'POST' && pathname === '/v1/generate') return await handleGenerate(req, env);
+    if (req.method === 'POST' && pathname === '/v1/stripe') return await handleStripe(req, env);
+    if (req.method === 'GET' && pathname === '/v1/threads/account') return await withUser(req, env, (id) => handleAccount(env, id));
+    if (req.method === 'POST' && pathname === '/v1/threads/connect') return await withUser(req, env, (id) => handleConnect(req, env, id));
+    if (req.method === 'POST' && pathname === '/v1/threads/disconnect') return await withUser(req, env, (id) => handleDisconnect(env, id));
+    if (req.method === 'GET' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleList(env, id));
+    if (req.method === 'POST' && pathname === '/v1/schedule') return await withUser(req, env, (id) => handleSchedule(req, env, id));
+    if (req.method === 'POST' && pathname === '/v1/schedule/cancel') return await withUser(req, env, (id) => handleCancel(req, env, id));
+    if (req.method === 'POST' && pathname === '/v1/ads/start') return await withUser(req, env, (id) => handleAdStart(req, env, id));
+    if (req.method === 'POST' && pathname === '/v1/ads/complete') return await withUser(req, env, (id) => handleAdComplete(req, env, id));
+    if (req.method === 'POST' && pathname === '/v1/dev/grant') return await handleDevGrant(req, env);
+    if (req.method === 'POST' && pathname === '/v1/dev/cron' && env.DEV_MODE === '1') {
+      await runAutopost(env);
+      return json({ ok: true });
+    }
+    return fail(404, 'not_found', 'not found');
+  } catch (e) {
+    console.error(e);
+    return fail(500, 'internal', 'サーバーエラーが発生しました。');
+  }
+}

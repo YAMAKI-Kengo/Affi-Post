@@ -41,7 +41,7 @@ export function threadsLength(s: string) {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' },
+    headers: { 'content-type': 'application/json; charset=utf-8' },
   });
 const fail = (status: number, code: string, message: string) => json({ error: code, message }, status);
 
@@ -69,6 +69,11 @@ export async function handleAccount(env: AutopostEnv, userId: string) {
 
 export async function handleConnect(req: Request, env: AutopostEnv, userId: string) {
   if (!env.TOKEN_ENC_KEY) return fail(503, 'disabled', '自動投稿は現在利用できません。');
+  // 他人のトークンの確認などに使われないよう、接続の試行は1端末1日10回まで
+  const key = `connect:${new Date().toISOString().slice(0, 10)}:${userId}`;
+  const tries = await env.DB.prepare('SELECT value FROM counters WHERE key = ?').bind(key).first<{ value: number }>();
+  if ((tries?.value ?? 0) >= 10) return fail(429, 'too_many', '接続の試行回数が多すぎます。明日もう一度お試しください。');
+  await env.DB.prepare('INSERT INTO counters (key, value) VALUES (?, 1) ON CONFLICT(key) DO UPDATE SET value = value + 1').bind(key).run();
   const body = (await req.json().catch(() => null)) as any;
   let token = String(body?.token ?? '').trim();
   const appSecret = String(body?.appSecret ?? '').trim();

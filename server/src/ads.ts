@@ -22,7 +22,7 @@ export interface AdsEnv {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' },
+    headers: { 'content-type': 'application/json; charset=utf-8' },
   });
 const fail = (status: number, code: string, message: string) => json({ error: code, message }, status);
 
@@ -144,7 +144,7 @@ export async function cleanupAds(env: AdsEnv) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM ad_sessions WHERE started_at < ?').bind(Date.now() - 24 * 3600 * 1000),
     env.DB.prepare(
-      "DELETE FROM counters WHERE (key LIKE 'adview:%' OR key LIKE 'adgrant:%' OR key LIKE 'adgrant_ip:%' OR key LIKE 'adstart:%' OR key LIKE 'product:%') AND substr(key, instr(key, ':') + 1, 10) < ?",
+      "DELETE FROM counters WHERE (key LIKE 'adview:%' OR key LIKE 'adgrant:%' OR key LIKE 'adgrant_ip:%' OR key LIKE 'adstart:%' OR key LIKE 'connect:%' OR key LIKE 'product:%') AND substr(key, instr(key, ':') + 1, 10) < ?",
     ).bind(old),
     // 生成結果の一時保存は2日で消す
     env.DB.prepare('DELETE FROM generations WHERE created_at < ?').bind(Date.now() - 2 * 24 * 3600 * 1000),
