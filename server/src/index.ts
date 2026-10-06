@@ -67,11 +67,12 @@ function addCounter(env: Env, key: string, n: number) {
   ).bind(key, n);
 }
 
+/** 端末IDの残り回数など。まだ一度も購入・付与がない端末は 0 として扱い、行は作らない */
 async function getUser(env: Env, id: string) {
-  await env.DB.prepare('INSERT OR IGNORE INTO users (id, created_at) VALUES (?, ?)').bind(id, Date.now()).run();
-  return (await env.DB.prepare('SELECT credits, free_credits, last_at FROM users WHERE id = ?')
+  const row = await env.DB.prepare('SELECT credits, free_credits, last_at FROM users WHERE id = ?')
     .bind(id)
-    .first<{ credits: number; free_credits: number; last_at: number }>())!;
+    .first<{ credits: number; free_credits: number; last_at: number }>();
+  return row ?? { credits: 0, free_credits: 0, last_at: 0 };
 }
 
 function installId(req: Request) {
@@ -135,13 +136,40 @@ async function handleGenerate(req: Request, env: Env) {
   };
   if (!input.product.name) return fail(400, 'bad_input', '商品名を入力してください。');
 
+  // 通信が切れて結果を受け取れなかったときの再試行用。同じ requestId なら回数を使わずに同じ結果を返す
+  const requestId = ID_RE.test(String(body?.requestId ?? '')) ? String(body.requestId).toLowerCase() : null;
+  const balance = async () => {
+    const u = await getUser(env, id);
+    return { credits: u.credits, freeCredits: u.free_credits };
+  };
+  if (requestId) {
+    const prev = await env.DB.prepare('SELECT body FROM generations WHERE request_id = ? AND user_id = ?')
+      .bind(requestId, id)
+      .first<{ body: string }>();
+    if (prev?.body) return json({ ...JSON.parse(prev.body), ...(await balance()), recovered: true });
+    if (prev) return fail(409, 'in_progress', '作成中です。数秒待ってからもう一度お試しください。');
+    const claim = await env.DB.prepare('INSERT OR IGNORE INTO generations (request_id, user_id, created_at) VALUES (?, ?, ?)')
+      .bind(requestId, id, Date.now())
+      .run();
+    if (!claim.meta.changes) return fail(409, 'in_progress', '作成中です。数秒待ってからもう一度お試しください。');
+  }
+  // 失敗したときは保存枠を消して、同じ requestId で作り直せるようにする
+  const releaseRequest = () =>
+    requestId ? env.DB.prepare('DELETE FROM generations WHERE request_id = ? AND body = ?').bind(requestId, '').run() : null;
+  const saveResult = (patterns: unknown) =>
+    requestId ? env.DB.prepare('UPDATE generations SET body = ? WHERE request_id = ?').bind(JSON.stringify({ patterns }), requestId).run() : null;
+
   const user = await getUser(env, id);
   const now = Date.now();
-  if (now - user.last_at < MIN_INTERVAL_MS) return fail(429, 'too_fast', '少し時間をおいてからお試しください。');
+  if (now - user.last_at < MIN_INTERVAL_MS) {
+    await releaseRequest();
+    return fail(429, 'too_fast', '少し時間をおいてからお試しください。');
+  }
 
   const maxTokens = Number(env.MAX_OUTPUT_TOKENS) || 3000;
   const budget = Math.round(Number(env.MONTHLY_BUDGET_USD) * 1_000_000);
   if ((await counter(env, monthKey())) + worstCaseCost(maxTokens) > budget) {
+    await releaseRequest();
     return fail(503, 'budget_exceeded', '今月のサービス提供上限に達しました。ご迷惑をおかけしますが、来月までお待ちください（回数は減りません）。');
   }
 
@@ -160,29 +188,30 @@ async function handleGenerate(req: Request, env: Env) {
       const msg = user.free_credits > 0
         ? '今月の無料分の提供上限に達しました。購入した回数でご利用ください。'
         : '残り回数がありません。「回数を追加」から購入するか、広告を見て無料分を受け取ってください。';
+      await releaseRequest();
       return fail(402, 'no_credits', msg);
     }
   }
   const refund = () => env.DB.prepare(`UPDATE users SET ${col} = ${col} + 1 WHERE id = ?`).bind(id).run();
-  const balance = async () => {
-    const u = await getUser(env, id);
-    return { credits: u.credits, freeCredits: u.free_credits };
-  };
   const addCost = (cost: number) =>
     col === 'free_credits'
       ? env.DB.batch([addCounter(env, monthKey(), cost), addCounter(env, freeCostKey(), cost)])
       : addCounter(env, monthKey(), cost).run();
 
   if (env.MOCK_AI === '1') {
-    return json({ patterns: MOCK_PATTERNS(input.product.name, input.linkPlacement === 'reply'), ...(await balance()) });
+    const patterns = MOCK_PATTERNS(input.product.name, input.linkPlacement === 'reply');
+    await saveResult(patterns);
+    return json({ patterns, ...(await balance()) });
   }
 
   try {
     const { patterns, costMicroUsd } = await generatePosts(env.ANTHROPIC_API_KEY, env.MODEL, maxTokens, input);
     await addCost(costMicroUsd);
+    await saveResult(patterns);
     return json({ patterns, ...(await balance()) });
   } catch (e) {
     await refund();
+    await releaseRequest();
     const cost = (e as { costMicroUsd?: number }).costMicroUsd;
     if (cost) await addCost(cost);
     if (e instanceof GenerateError) return fail(e.status, e.code, e.message);
@@ -202,10 +231,10 @@ const parseMap = (s = '') =>
   );
 
 /** 購入イベントごとに1回だけ回数を付与する */
-async function grantCredits(env: Env, eventId: string, userId: string, productId: string, credits: number) {
+async function grantCredits(env: Env, eventId: string, userId: string, productId: string, credits: number, email = '') {
   await env.DB.prepare('INSERT OR IGNORE INTO users (id, created_at) VALUES (?, ?)').bind(userId, Date.now()).run();
-  const ins = await env.DB.prepare('INSERT OR IGNORE INTO purchases (event_id, user_id, product_id, credits, at) VALUES (?, ?, ?, ?, ?)')
-    .bind(eventId, userId, productId, credits, Date.now())
+  const ins = await env.DB.prepare('INSERT OR IGNORE INTO purchases (event_id, user_id, product_id, credits, at, email) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(eventId, userId, productId, credits, Date.now(), email)
     .run();
   if (ins.meta.changes) {
     await env.DB.prepare('UPDATE users SET credits = credits + ? WHERE id = ?').bind(credits, userId).run();
@@ -242,12 +271,21 @@ async function handleStripe(req: Request, env: Env) {
   const links = parseMap(env.STRIPE_LINKS);
   // 金額では判定しない（他のアプリの同じ金額の商品で回数が付与されるのを防ぐ）
   const credits = links.get(session.payment_link);
+  // アフィポ以外の Payment Link（同じ Stripe アカウントの他アプリ）や未払いは無視する
+  if (!credits || session.payment_status !== 'paid') return json({ ok: true, ignored: true });
   const userId = String(session.client_reference_id ?? '').toLowerCase();
-  if (session.payment_status !== 'paid' || !credits || !ID_RE.test(userId)) {
-    console.error('stripe: not granted', session.id, session.payment_link, session.payment_status);
-    return json({ ok: true, ignored: true });
+  const email = String(session.customer_details?.email ?? '').slice(0, 200);
+  if (!ID_RE.test(userId)) {
+    // アプリを通さずにリンクを開いて購入された等。支払いは記録し、問い合わせ時にメールアドレスで照合して手作業で付与する
+    console.error('stripe: payment without install id', session.id);
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO unmatched_payments (session_id, payment_link, credits, email, client_reference_id, at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+      .bind(session.id, session.payment_link, credits, email, String(session.client_reference_id ?? '').slice(0, 200), Date.now())
+      .run();
+    return json({ ok: true, unmatched: true });
   }
-  await grantCredits(env, session.id, userId, session.payment_link ?? '', credits);
+  await grantCredits(env, session.id, userId, session.payment_link ?? '', credits, email);
   return json({ ok: true });
 }
 
@@ -255,7 +293,6 @@ async function handleStripe(req: Request, env: Env) {
 async function withUser(req: Request, env: Env, fn: (id: string) => Promise<Response>) {
   const id = installId(req);
   if (!id) return fail(400, 'bad_install_id', '端末IDが不正です。');
-  await getUser(env, id);
   return fn(id);
 }
 

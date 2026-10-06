@@ -3,7 +3,8 @@ import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../AppContext';
-import { ApiError, fetchProductInfo, generate } from '../api';
+import { ApiError, buildGenerateRequest, fetchProductInfo, generate } from '../api';
+import * as Crypto from 'expo-crypto';
 import { THREADS_MAX_CHARS } from '../config';
 import { charCount, checkExpressions, hasDisclosure, isHttpUrl, looksLikeAffiliate, withDisclosure } from '../compliance';
 import { BUILT_IN_TEMPLATES, loadCustomTemplates, loadProductDraft, saveProductDraft, upsertHistory } from '../storage';
@@ -21,6 +22,8 @@ const TONES = [
   { label: '落ち着いた', emoji: '🍵' },
 ];
 const K_WELCOME = 'welcome_hidden_v1';
+// 通信が切れて結果を受け取れなかった作成（同じ内容なら同じ番号で送り直し、回数を二重に使わない）
+const K_PENDING = 'pending_generation_v1';
 const K_RESULT = 'last_result_v1';
 
 interface Editor extends Draft {
@@ -145,16 +148,33 @@ export default function CreateScreen() {
       return setTab('settings');
     }
     setGenerating(true);
+    const req = buildGenerateRequest(product, `${template.name}: ${template.instruction}`, settings.tone, settings.linkPlacement);
+    const fingerprint = JSON.stringify(req);
+    let requestId: string = Crypto.randomUUID();
     try {
-      const r = await generate(product, `${template.name}: ${template.instruction}`, settings.tone, settings.linkPlacement);
+      const pending = JSON.parse((await AsyncStorage.getItem(K_PENDING)) ?? 'null');
+      if (pending?.fingerprint === fingerprint && Date.now() - pending.at < 24 * 3600 * 1000) requestId = pending.requestId;
+    } catch {}
+    await AsyncStorage.setItem(K_PENDING, JSON.stringify({ requestId, fingerprint, at: Date.now() }));
+    try {
+      const r = await generate(req, requestId);
+      await AsyncStorage.removeItem(K_PENDING);
+      if (r.recovered) toast('前回受け取れなかった結果を表示しました（回数は使っていません）。');
       setBalance({ credits: r.credits, freeCredits: r.freeCredits });
       setPatterns(r.patterns);
       setSelected(null);
       setEditor(null);
       setTimeout(() => scroll.current?.scrollTo({ y: resultsY.current - 12, animated: true }), 100);
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : '作成できませんでした。もう一度お試しください。');
-      if (e instanceof ApiError && e.code === 'no_credits') refreshCredits();
+      const network = e instanceof ApiError && (e.code === 'network' || e.code === 'in_progress');
+      if (network) {
+        // 同じ番号を残しておき、もう一度押したときに回数を使わずに結果を受け取れるようにする
+        toast('通信が切れました。もう一度「作る」を押すと、回数を二重に使わずに結果を受け取れます。');
+      } else {
+        await AsyncStorage.removeItem(K_PENDING);
+        toast(e instanceof ApiError ? e.message : '作成できませんでした。もう一度お試しください。');
+        if (e instanceof ApiError && e.code === 'no_credits') refreshCredits();
+      }
     } finally {
       setGenerating(false);
     }

@@ -58,16 +58,35 @@ export const fetchProductInfo = (url: string) =>
     body: { url },
   });
 
-export const generate = (p: ProductForm, template: string, tone: string, linkPlacement: LinkPlacement) =>
-  call<{ patterns: Pattern[]; credits: number; freeCredits: number }>('/v1/generate', {
+export interface GenerateRequest {
+  product: { name: string; price: string; description: string; experience: string };
+  target: string;
+  template: string;
+  tone: string;
+  linkPlacement: LinkPlacement;
+}
+
+export const buildGenerateRequest = (
+  p: ProductForm,
+  template: string,
+  tone: string,
+  linkPlacement: LinkPlacement,
+): GenerateRequest => ({
+  product: { name: p.name, price: p.price, description: p.description, experience: p.experience },
+  target: p.target,
+  template,
+  tone,
+  linkPlacement,
+});
+
+/**
+ * 投稿文を作る。requestId は1回の作成ごとの番号で、通信が切れたときに同じ番号で送り直すと、
+ * サーバーは回数を使わずに保存済みの結果を返す。
+ */
+export const generate = (req: GenerateRequest, requestId: string) =>
+  call<{ patterns: Pattern[]; credits: number; freeCredits: number; recovered?: boolean }>('/v1/generate', {
     method: 'POST',
-    body: {
-      product: { name: p.name, price: p.price, description: p.description, experience: p.experience },
-      target: p.target,
-      template,
-      tone,
-      linkPlacement,
-    },
+    body: { ...req, requestId },
   });
 
 // ---- 自動投稿（予約投稿・上級者向け） ----

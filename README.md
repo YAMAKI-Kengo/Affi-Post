@@ -86,3 +86,27 @@ npx expo start --web --port 8081
 ## 将来ストアアプリにする場合
 - `npx eas-cli build` で iOS / Android をビルドできる（`EXPO_PUBLIC_API_BASE` に Worker の URL を設定）
 - ストア配信版でデジタルの回数を売るには App Store / Google Play のアプリ内課金が必須（手数料 15〜30%）。価格の見直しと、`x-search-app` と同じ RevenueCat 連携が必要
+
+## 問い合わせ対応（購入した回数が反映されない・端末が変わった）
+本番 D1 を直接操作する（`server` フォルダで実行）。
+
+1. 購入を探す（メールアドレスで照合）
+   ```
+   npx wrangler d1 execute affi-post --remote --command "SELECT event_id, user_id, credits, datetime(at/1000,'unixepoch','+9 hours') AS jst FROM purchases WHERE email = 'メールアドレス'"
+   npx wrangler d1 execute affi-post --remote --command "SELECT session_id, credits, datetime(at/1000,'unixepoch','+9 hours') AS jst, resolved_user FROM unmatched_payments WHERE email = 'メールアドレス'"
+   ```
+2. 端末IDのない支払い（unmatched_payments）を、利用者の今の引き継ぎコードに付与する
+   ```
+   npx wrangler d1 execute affi-post --remote --command "INSERT OR IGNORE INTO users (id, created_at) VALUES ('引き継ぎコード', 0); UPDATE users SET credits = credits + (SELECT credits FROM unmatched_payments WHERE session_id = 'cs_...' AND resolved_user IS NULL) WHERE id = '引き継ぎコード'; UPDATE unmatched_payments SET resolved_user = '引き継ぎコード' WHERE session_id = 'cs_...' AND resolved_user IS NULL"
+   ```
+3. 端末のデータが消えて元のコードが分からない場合は、1 で見つけた user_id の残り回数を新しいコードへ移す（本人のメールアドレスからの問い合わせであることを確認してから）
+   ```
+   npx wrangler d1 execute affi-post --remote --command "INSERT OR IGNORE INTO users (id, created_at) VALUES ('新しいコード', 0); UPDATE users SET credits = credits + (SELECT credits FROM users WHERE id = '古いコード') WHERE id = '新しいコード'; UPDATE users SET credits = 0 WHERE id = '古いコード'"
+   ```
+
+## 信頼性・悪用への対策（まとめ）
+- 回数の付与は Stripe → サーバーの Webhook で行う。購入者が支払い後にオフラインになっても付与される。失敗時は Stripe が最大3日間再送し、同じ購入は二重に付与しない
+- 生成は requestId ごとに結果を2日間保存。通信が切れても同じ requestId で再試行すれば回数を使わずに同じ結果を返す
+- AI の出力は1回3,000トークンまで（無限に出力させられない）。入力欄は文字数上限あり。1回ごとに回数を消費、3秒の連続実行制限、月間 API 予算の上限
+- 入力欄の内容は「素材」として扱い、ルール（誇張表現の禁止・事実を作らない等）を上書きさせない指示を AI に与えている
+- 残り回数の確認だけではユーザー行を作らない。広告視聴の開始は1端末1日20回まで

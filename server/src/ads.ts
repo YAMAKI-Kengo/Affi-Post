@@ -90,6 +90,11 @@ export async function handleAdStart(req: Request, env: AdsEnv, userId: string) {
   if ((await counter(env, `adgrant_ip:${d}:${ip}`)) >= c.perIp) {
     return fail(429, 'daily_cap', '今日の無料分は終了しました。また明日お試しください。');
   }
+  // 視聴開始だけを大量に呼ばれて記録が溜まらないよう、1端末1日の回数に上限を設ける
+  if ((await counter(env, `adstart:${d}:${userId}`)) >= 20) {
+    return fail(429, 'daily_cap', '今日はこれ以上広告を表示できません。また明日お試しください。');
+  }
+  await addCounter(env, `adstart:${d}:${userId}`, 1).run();
   const nonce = crypto.randomUUID();
   await env.DB.prepare('INSERT INTO ad_sessions (nonce, user_id, ip_hash, started_at) VALUES (?, ?, ?, ?)')
     .bind(nonce, userId, ip, Date.now())
@@ -123,6 +128,7 @@ export async function handleAdComplete(req: Request, env: AdsEnv, userId: string
     (await freeBudgetLeft(env, 0))
   ) {
     await env.DB.batch([
+      env.DB.prepare('INSERT OR IGNORE INTO users (id, created_at) VALUES (?, ?)').bind(userId, Date.now()),
       env.DB.prepare('UPDATE users SET free_credits = free_credits + 1 WHERE id = ?').bind(userId),
       addCounter(env, `adgrant:${d}:${userId}`, 1),
       addCounter(env, `adgrant_ip:${d}:${s.ip_hash}`, 1),
@@ -138,7 +144,9 @@ export async function cleanupAds(env: AdsEnv) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM ad_sessions WHERE started_at < ?').bind(Date.now() - 24 * 3600 * 1000),
     env.DB.prepare(
-      "DELETE FROM counters WHERE (key LIKE 'adview:%' OR key LIKE 'adgrant:%' OR key LIKE 'adgrant_ip:%' OR key LIKE 'product:%') AND substr(key, instr(key, ':') + 1, 10) < ?",
+      "DELETE FROM counters WHERE (key LIKE 'adview:%' OR key LIKE 'adgrant:%' OR key LIKE 'adgrant_ip:%' OR key LIKE 'adstart:%' OR key LIKE 'product:%') AND substr(key, instr(key, ':') + 1, 10) < ?",
     ).bind(old),
+    // 生成結果の一時保存は2日で消す
+    env.DB.prepare('DELETE FROM generations WHERE created_at < ?').bind(Date.now() - 2 * 24 * 3600 * 1000),
   ]);
 }
