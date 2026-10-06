@@ -94,18 +94,27 @@ export default function SettingsScreen() {
           <>
             <View style={ss.packs}>
               {WEB_PACKS.map((p, i) => {
-                const [count, price] = p.label.split(/\s+/);
-                const n = Number(count.replace(/\D/g, ''));
+                // "プラン名 回数 価格"（プラン名は省略可）
+                const parts = p.label.split(/\s+/);
+                const [name, count, price] = parts.length >= 3 ? parts : ['', parts[0], parts[1]];
+                const n = Number((count ?? '').replace(/\D/g, ''));
                 const yen = Number((price ?? '').replace(/\D/g, ''));
-                const best = i === WEB_PACKS.length - 1 && WEB_PACKS.length > 1;
+                // 3プランなら真ん中を「人気」、最後を「おトク」にする
+                const popular = WEB_PACKS.length >= 3 && i === 1;
+                const deal = WEB_PACKS.length >= 2 && i === WEB_PACKS.length - 1;
                 return (
-                  <Pressable key={p.url} onPress={() => buy(p.url)} style={[ss.pack, best && ss.packBest]} accessibilityRole="button">
-                    {best ? <Text style={ss.badge}>おトク</Text> : null}
-                    <Text style={ss.packCount}>{count}</Text>
-                    <Text style={ss.packPrice}>{price}</Text>
-                    {n && yen ? <Text style={styles.small}>1回あたり {Math.round((yen / n) * 10) / 10}円</Text> : null}
-                    <View style={ss.packBtn}>
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>購入する</Text>
+                  <Pressable key={p.url} onPress={() => buy(p.url)} style={[ss.pack, popular && ss.packBest]} accessibilityRole="button">
+                    {popular ? <Text style={ss.badge}>人気</Text> : null}
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.row}>
+                        {name ? <Text style={ss.packName}>{name}</Text> : null}
+                        {deal ? <Text style={ss.dealTag}>おトク</Text> : null}
+                      </View>
+                      <Text style={ss.packCount}>{count}</Text>
+                      {n && yen ? <Text style={[styles.small, { fontSize: 12 }]}>1回あたり {Math.round((yen / n) * 10) / 10}円</Text> : null}
+                    </View>
+                    <View style={[ss.packBtn, !popular && { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.accent }]}>
+                      <Text style={{ color: popular ? '#fff' : colors.accentDark, fontWeight: '700', fontSize: 16 }}>{price}</Text>
                     </View>
                   </Pressable>
                 );
@@ -199,21 +208,22 @@ const ss = StyleSheet.create({
   heroNum: { color: '#fff', fontSize: 44, fontWeight: '700', marginTop: 4 },
   heroUnit: { color: '#fff', fontSize: 18, fontWeight: '700' },
   heroSub: { color: 'rgba(255,255,255,0.92)', fontSize: 13, marginTop: 4, lineHeight: 19 },
-  packs: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  packs: { gap: 12, marginTop: 16 },
   pack: {
-    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     backgroundColor: '#FFFCFA',
   },
   packBest: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   badge: {
     position: 'absolute',
     top: -10,
+    left: 14,
     backgroundColor: colors.accent,
     color: '#fff',
     fontSize: 11,
@@ -223,9 +233,10 @@ const ss = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
-  packCount: { fontSize: 22, fontWeight: '700' },
-  packPrice: { fontSize: 16, fontWeight: '700', color: colors.accentDark, marginTop: 2, marginBottom: 4 },
-  packBtn: { backgroundColor: colors.accent, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 16, marginTop: 10 },
+  packName: { fontSize: 13, fontWeight: '700', color: colors.sub },
+  dealTag: { fontSize: 11, fontWeight: '700', color: colors.ok, backgroundColor: colors.okSoft, borderRadius: 8, paddingHorizontal: 6, marginLeft: 6, overflow: 'hidden' },
+  packCount: { fontSize: 22, fontWeight: '700', marginTop: 2 },
+  packBtn: { backgroundColor: colors.accent, borderRadius: 22, paddingVertical: 10, paddingHorizontal: 18, minWidth: 92, alignItems: 'center' },
   code: { backgroundColor: '#FAF4EF', borderRadius: 12, padding: 12, marginTop: 12, marginBottom: 6 },
   linkRow: {
     flexDirection: 'row',

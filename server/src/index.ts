@@ -27,7 +27,7 @@ export interface Env extends AutopostEnv, AdsEnv {
   MODEL: string;
   MAX_OUTPUT_TOKENS: string;
   MONTHLY_BUDGET_USD: string;
-  /** Payment Link ID または「通貨+金額」=付与回数（例: "plink_xxx:30" や "jpy300:30,jpy800:100"） */
+  /** Payment Link ID = 付与回数（例: "plink_xxx:10,plink_yyy:50"）。ここにない決済は無視する */
   STRIPE_LINKS?: string;
   /** Stripe Webhook の署名シークレット（whsec_...） */
   STRIPE_WEBHOOK_SECRET?: string;
@@ -240,7 +240,8 @@ async function handleStripe(req: Request, env: Env) {
   if (ev.type !== 'checkout.session.completed') return json({ ok: true, ignored: true });
   const session = ev.data?.object ?? {};
   const links = parseMap(env.STRIPE_LINKS);
-  const credits = links.get(session.payment_link) ?? links.get(`${session.currency}${session.amount_total}`);
+  // 金額では判定しない（他のアプリの同じ金額の商品で回数が付与されるのを防ぐ）
+  const credits = links.get(session.payment_link);
   const userId = String(session.client_reference_id ?? '').toLowerCase();
   if (session.payment_status !== 'paid' || !credits || !ID_RE.test(userId)) {
     console.error('stripe: not granted', session.id, session.payment_link, session.payment_status);

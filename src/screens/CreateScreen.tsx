@@ -242,7 +242,7 @@ export default function CreateScreen() {
             <Text style={{ fontWeight: '700', fontSize: 16, marginLeft: 8 }}>まずは回数を追加しましょう</Text>
           </View>
           <Text style={[styles.small, { marginTop: 6 }]}>
-            1回で投稿文が3パターンできます。30回300円から。購入した回数に期限はありません。
+            1回で投稿文が3パターンできます。10回160円から。購入した回数に期限はありません。
           </Text>
           <Button title="回数を購入する" icon="cart" onPress={() => setTab('settings')} />
           <RewardedButton />

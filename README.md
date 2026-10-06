@@ -66,9 +66,9 @@ npx expo start --web --port 8081
    npx wrangler secret put STRIPE_WEBHOOK_SECRET
    npx wrangler secret put TOKEN_ENC_KEY      # 長いランダム文字列。変えると全員が Threads の再接続になる
    ```
-3. Stripe で Payment Link を2つ作成（30回 300円 / 100回 800円）
-   - 支払い完了後の動作:「自分のウェブサイトにリダイレクト」→ デプロイ先の URL（例 `https://affi-post.<subdomain>.workers.dev/`）
-   - `server/wrangler.toml` の `STRIPE_LINKS`（`jpy300:30,jpy800:100`）と金額を一致させる
+3. Stripe で Payment Link を3つ作成（お試し10回 160円 / 定番50回 480円 / たっぷり120回 980円）
+   - 支払い後は Stripe の確認ページのまま（iPhone ではホーム画面のアプリと Safari でデータが別なので、アプリへリダイレクトしない）
+   - `server/wrangler.toml` の `STRIPE_LINKS` に各リンクの ID（`plink_...`）と回数を書く。Stripe アカウントは他アプリと共用のため、ID の一致しない決済は無視する
    - Webhook: イベント `checkout.session.completed`、送信先 `https://<デプロイ先>/v1/stripe`
 4. `.env.production` の `EXPO_PUBLIC_WEB_PACKS` に Payment Link の URL を記入
 5. ビルドしてデプロイ
@@ -81,7 +81,7 @@ npx expo start --web --port 8081
 
 ### 料金の目安（Claude Sonnet 5.5: 入力 $2 / 出力 $10 per 1M tokens）
 - 1回の作成: 約 $0.01〜0.02（約2〜3円）。上限 `MAX_OUTPUT_TOKENS=3000` の最悪ケースでも約 $0.04（約6円）
-- 販売単価: 300円/30回 = 10円/回、800円/100回 = 8円/回。Stripe 手数料 3.6% を引いても1回あたり原価を上回る
+- 販売単価: 160円/10回 = 16円、480円/50回 = 9.6円、980円/120回 = 8.2円。Stripe 手数料 3.6% を引いても1回あたり原価（約1.5円）を大きく上回る
 
 ## 将来ストアアプリにする場合
 - `npx eas-cli build` で iOS / Android をビルドできる（`EXPO_PUBLIC_API_BASE` に Worker の URL を設定）

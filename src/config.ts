@@ -6,7 +6,7 @@ export const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? '').replace(/\/$/, 
 
 /**
  * 回数パック（Stripe Payment Link）
- * 形式: "表示名|URL,表示名|URL"  例: "30回 300円|https://buy.stripe.com/xxx"
+ * 形式: "プラン名 回数 価格|URL" をカンマ区切り  例: "定番 50回 480円|https://buy.stripe.com/xxx"
  */
 export const WEB_PACKS: { label: string; url: string }[] = String(process.env.EXPO_PUBLIC_WEB_PACKS ?? '')
   .split(',')

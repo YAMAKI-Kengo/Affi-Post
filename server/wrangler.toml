@@ -25,8 +25,9 @@ MODEL = "claude-sonnet-5-5"
 MAX_OUTPUT_TOKENS = "3000"
 # 月間の Claude API 費用上限（USD）。超えると翌月まで生成を止める。売れたら引き上げる
 MONTHLY_BUDGET_USD = "20"
-# Stripe 決済 = 付与回数。キーは Payment Link ID（plink_...）か「通貨+支払額」（jpy300 など）
-STRIPE_LINKS = "jpy300:30,jpy800:100"
+# Stripe の Payment Link ID = 付与回数。Stripe アカウントは他のアプリと共用するため、ここにある ID の決済だけを受け付ける
+# お試し 10回 160円 / 定番 50回 480円 / たっぷり 120回 980円
+STRIPE_LINKS = "plink_1UNevcRz7oqxshxk8Ngmo6th:10,plink_1UNeySRz7oqxshxkYqsT02hU:50,plink_1UNezBRz7oqxshxk3yRBTFU9:120"
 
 # リワード広告（広告を見たら無料で1回分）。Google Ad Manager の審査が通ってから "1" にする
 AD_REWARD_ENABLED = "0"

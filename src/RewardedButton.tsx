@@ -40,7 +40,7 @@ export default function RewardedButton() {
 
   return (
     <>
-      <Button title={`広告を見て無料で1回分（あと${remaining}本）`} icon="play-circle-outline" kind="secondary" onPress={watch} loading={busy} />
+      <Button title={`広告で無料の1回分（あと${remaining}本）`} icon="play-circle-outline" kind="secondary" onPress={watch} loading={busy} />
       <Text style={[styles.small, { marginTop: 6 }]}>
         広告{ad.viewsPerCredit}本で、文章の作成1回分を無料で受け取れます（1日1回まで）。無料分は予約投稿には使えません。
       </Text>
